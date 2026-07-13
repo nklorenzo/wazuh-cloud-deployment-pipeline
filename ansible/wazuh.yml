@@ -1,10 +1,10 @@
 ---
-- name: Install Wazuh All-in-One
+- name: Installation de Wazuh tout-en-un
   hosts: wazuh
   become: true
 
   tasks:
-    - name: Install dependencies
+    - name: Installation des dépendances
       apt:
         name:
           - curl
@@ -12,18 +12,18 @@
         state: present
         update_cache: true
 
-    - name: Download Wazuh install script
+    - name: Téléchargement du script d'installation Wazuh
       get_url:
         url: https://packages.wazuh.com/4.14/wazuh-install.sh
         dest: /tmp/wazuh-install.sh
         mode: '0755'
 
-    - name: Check if Wazuh is already installed
+    - name: Vérification si Wazuh est déjà installé
       stat:
         path: /var/ossec/bin/wazuh-control
       register: wazuh_installed
 
-    - name: Run Wazuh all-in-one installation
+    - name: Lancement de l'installation Wazuh tout-en-un
       command: bash /tmp/wazuh-install.sh -a
       args:
         chdir: /tmp
@@ -31,32 +31,32 @@
       poll: 30
       when: not wazuh_installed.stat.exists
 
-    - name: Find wazuh-install-files.tar
+    - name: Recherche du fichier wazuh-install-files.tar
       find:
         paths: ["/tmp", "/root", "/home"]
         patterns: "wazuh-install-files.tar"
         recurse: true
       register: tar_file
 
-    - name: Retrieve Wazuh credentials
+    - name: Récupération des credentials Wazuh
       command: tar -O -xvf {{ tar_file.files[0].path }} wazuh-install-files/wazuh-passwords.txt
       register: wazuh_credentials
       when: tar_file.files | length > 0
 
-    - name: Warn if credentials file not found
+    - name: Fichier de credentials introuvable
       debug:
         msg: "wazuh-install-files.tar introuvable, récupère les credentials manuellement sur l'instance."
       when: tar_file.files | length == 0
 
-    - name: Display Wazuh credentials
+    - name: Affichage des credentials Wazuh
       debug:
         msg: "{{ wazuh_credentials.stdout_lines }}"
       when: tar_file.files | length > 0
 
-    - name: Install Tailscale
+    - name: Installation de Tailscale
       shell: curl -fsSL https://tailscale.com/install.sh | sh
       args:
         executable: /bin/bash
 
-    - name: Authenticate Tailscale
+    - name: Authentification Tailscale
       command: tailscale up --authkey={{ tailscale_authkey }} --accept-routes
