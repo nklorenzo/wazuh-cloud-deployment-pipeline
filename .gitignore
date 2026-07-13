@@ -1,1 +1,15 @@
 terraform/.terraform
+
+# Terraform state
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+
+# Variables sensibles
+terraform/terraform.tfvars
+
+# Clés SSH
+*.pem
+*.key
+
+# Ansible vault
+ansible/vault.yml

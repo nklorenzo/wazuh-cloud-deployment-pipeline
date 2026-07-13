@@ -18,17 +18,45 @@
         dest: /tmp/wazuh-install.sh
         mode: '0755'
 
+    - name: Check if Wazuh is already installed
+      stat:
+        path: /var/ossec/bin/wazuh-control
+      register: wazuh_installed
+
     - name: Run Wazuh all-in-one installation
       command: bash /tmp/wazuh-install.sh -a
       args:
         chdir: /tmp
       async: 1800
       poll: 30
+      when: not wazuh_installed.stat.exists
+
+    - name: Find wazuh-install-files.tar
+      find:
+        paths: ["/tmp", "/root", "/home"]
+        patterns: "wazuh-install-files.tar"
+        recurse: true
+      register: tar_file
 
     - name: Retrieve Wazuh credentials
-      command: tar -O -xvf /tmp/wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt
+      command: tar -O -xvf {{ tar_file.files[0].path }} wazuh-install-files/wazuh-passwords.txt
       register: wazuh_credentials
+      when: tar_file.files | length > 0
+
+    - name: Warn if credentials file not found
+      debug:
+        msg: "wazuh-install-files.tar introuvable, récupère les credentials manuellement sur l'instance."
+      when: tar_file.files | length == 0
 
     - name: Display Wazuh credentials
       debug:
         msg: "{{ wazuh_credentials.stdout_lines }}"
+      when: tar_file.files | length > 0
+
+    - name: Install Tailscale
+      shell: curl -fsSL https://tailscale.com/install.sh | sh
+      args:
+        executable: /bin/bash
+
+    - name: Authenticate Tailscale
+      command: tailscale up --authkey={{ tailscale_authkey }} --accept-routes
