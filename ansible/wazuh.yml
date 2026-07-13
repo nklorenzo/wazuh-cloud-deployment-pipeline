@@ -1,0 +1,34 @@
+---
+- name: Install Wazuh All-in-One
+  hosts: wazuh
+  become: true
+
+  tasks:
+    - name: Install dependencies
+      apt:
+        name:
+          - curl
+          - tar
+        state: present
+        update_cache: true
+
+    - name: Download Wazuh install script
+      get_url:
+        url: https://packages.wazuh.com/4.14/wazuh-install.sh
+        dest: /tmp/wazuh-install.sh
+        mode: '0755'
+
+    - name: Run Wazuh all-in-one installation
+      command: bash /tmp/wazuh-install.sh -a
+      args:
+        chdir: /tmp
+      async: 1800
+      poll: 30
+
+    - name: Retrieve Wazuh credentials
+      command: tar -O -xvf /tmp/wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt
+      register: wazuh_credentials
+
+    - name: Display Wazuh credentials
+      debug:
+        msg: "{{ wazuh_credentials.stdout_lines }}"
