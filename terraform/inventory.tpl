@@ -1,5 +1,5 @@
 [wazuh]
-wazuh-manager ansible_host=16.16.172.121
+wazuh-manager ansible_host=${wazuh_ip}
 
 [wazuh:vars]
 ansible_user=ubuntu

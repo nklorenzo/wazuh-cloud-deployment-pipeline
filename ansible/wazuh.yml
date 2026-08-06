@@ -59,4 +59,4 @@
         executable: /bin/bash
 
     - name: Authentification Tailscale
-      command: tailscale up --authkey={{ tailscale_authkey }} --accept-routes
+      command: tailscale up  --authkey={{ tailscale_authkey }} --accept-routes

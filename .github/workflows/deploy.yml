@@ -1,0 +1,76 @@
+name: Deploy Wazuh Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-north-1
+
+jobs:
+  terraform:
+    name: Provision infrastructure
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Configuration des credentials AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Installation de Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform -chdir=terraform init
+
+      - name: Terraform Apply
+        run: terraform -chdir=terraform apply -auto-approve
+
+      - name: Sauvegarde de l'inventaire Ansible
+        uses: actions/upload-artifact@v4
+        with:
+          name: ansible-inventory
+          path: ansible/inventory.ini
+
+  ansible:
+    name: Installation de Wazuh
+    runs-on: ubuntu-latest
+    needs: terraform
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Récupération de l'inventaire généré
+        uses: actions/download-artifact@v4
+        with:
+          name: ansible-inventory
+          path: ansible/
+
+      - name: Installation d'Ansible
+        run: pip install ansible
+
+      - name: Configuration de la clé SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/wazuh-key
+          chmod 600 ~/.ssh/wazuh-key
+
+      - name: Création du fichier vault
+        run: |
+          echo "tailscale_authkey: ${{ secrets.TAILSCALE_AUTHKEY }}" > ansible/vault.yml
+          ansible-vault encrypt ansible/vault.yml --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}")
+
+      - name: Exécution du playbook Wazuh
+        run: |
+          ansible-playbook -i ansible/inventory.ini ansible/wazuh.yml \
+            --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}") \
+            -e @ansible/vault.yml
