@@ -14,7 +14,7 @@ terraform {
     bucket         = "projet-stage-tfstate-336471570575"
     key            = "projet-stage/terraform.tfstate"
     region         = "eu-north-1"
-    dynamodb_table = "terraform-lock"
+    use_lockfile   = true
     encrypt        = true
   }
 }
