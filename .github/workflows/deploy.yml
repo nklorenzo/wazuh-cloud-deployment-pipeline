@@ -5,13 +5,22 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action à effectuer'
+        required: true
+        default: 'apply'
+        type: choice
+        options:
+          - apply
+          - destroy
 
 env:
   AWS_REGION: eu-north-1
 
 jobs:
   terraform:
-    name: Provision infrastructure
+    name: Terraform ${{ github.event.inputs.action || 'apply' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -25,9 +34,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Installation de Terraform
-        uses: hashicorp/setup-terraform@v3
-
       - name: Configuration de la clé SSH publique
         run: |
           mkdir -p ~/.ssh
@@ -35,13 +41,22 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/wazuh-key
           chmod 600 ~/.ssh/wazuh-key
 
+      - name: Installation de Terraform
+        uses: hashicorp/setup-terraform@v3
+
       - name: Terraform Init
         run: terraform -chdir=terraform init
 
       - name: Terraform Apply
+        if: ${{ github.event.inputs.action != 'destroy' }}
         run: terraform -chdir=terraform apply -auto-approve
 
+      - name: Terraform Destroy
+        if: ${{ github.event.inputs.action == 'destroy' }}
+        run: terraform -chdir=terraform destroy -auto-approve
+
       - name: Sauvegarde de l'inventaire Ansible
+        if: ${{ github.event.inputs.action != 'destroy' }}
         uses: actions/upload-artifact@v4
         with:
           name: ansible-inventory
@@ -51,6 +66,7 @@ jobs:
     name: Installation de Wazuh
     runs-on: ubuntu-latest
     needs: terraform
+    if: ${{ github.event.inputs.action != 'destroy' }}
 
     steps:
       - name: Récupération du code
