@@ -28,6 +28,13 @@ jobs:
       - name: Installation de Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Configuration de la clé SSH publique
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/wazuh-key.pub
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/wazuh-key
+          chmod 600 ~/.ssh/wazuh-key
+
       - name: Terraform Init
         run: terraform -chdir=terraform init
 
