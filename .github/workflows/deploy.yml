@@ -19,9 +19,53 @@ env:
   AWS_REGION: eu-north-1
 
 jobs:
+  test:
+    name: Validation du code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Configuration des credentials AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configuration de la clé SSH publique
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/wazuh-key.pub
+          chmod 600 ~/.ssh/wazuh-key.pub
+
+      - name: Installation de Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform -chdir=terraform init
+
+      - name: Terraform Validate
+        run: terraform -chdir=terraform validate
+
+      - name: Terraform Plan
+        run: terraform -chdir=terraform plan
+        if: ${{ github.event.inputs.action != 'destroy' }}
+
+      - name: Installation d'Ansible et ansible-lint
+        run: pip install ansible ansible-lint
+
+      - name: Vérification syntaxe du playbook
+        run: ansible-playbook --syntax-check ansible/wazuh.yml -i ansible/inventory.ini
+
+      - name: Ansible Lint
+        run: ansible-lint ansible/wazuh.yml
+
   terraform:
     name: Terraform ${{ github.event.inputs.action || 'apply' }}
     runs-on: ubuntu-latest
+    needs: test
 
     steps:
       - name: Récupération du code
