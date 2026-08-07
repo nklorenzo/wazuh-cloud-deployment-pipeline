@@ -5,7 +5,7 @@
 
   tasks:
     - name: Installation des dépendances
-      apt:
+      ansible.builtin.apt:
         name:
           - curl
           - tar
@@ -13,50 +13,60 @@
         update_cache: true
 
     - name: Téléchargement du script d'installation Wazuh
-      get_url:
+      ansible.builtin.get_url:
         url: https://packages.wazuh.com/4.14/wazuh-install.sh
         dest: /tmp/wazuh-install.sh
         mode: '0755'
 
     - name: Vérification si Wazuh est déjà installé
-      stat:
+      ansible.builtin.stat:
         path: /var/ossec/bin/wazuh-control
       register: wazuh_installed
 
     - name: Lancement de l'installation Wazuh tout-en-un
-      command: bash /tmp/wazuh-install.sh -a
+      ansible.builtin.command: bash /tmp/wazuh-install.sh -a
       args:
         chdir: /tmp
       async: 1800
       poll: 30
       when: not wazuh_installed.stat.exists
+      changed_when: true
 
     - name: Recherche du fichier wazuh-install-files.tar
-      find:
+      ansible.builtin.find:
         paths: ["/tmp", "/root", "/home"]
         patterns: "wazuh-install-files.tar"
         recurse: true
       register: tar_file
 
     - name: Récupération des credentials Wazuh
-      command: tar -O -xvf {{ tar_file.files[0].path }} wazuh-install-files/wazuh-passwords.txt
+      ansible.builtin.command: tar -O -xvf {{ tar_file.files[0].path }} wazuh-install-files/wazuh-passwords.txt
       register: wazuh_credentials
       when: tar_file.files | length > 0
+      changed_when: false
 
     - name: Fichier de credentials introuvable
-      debug:
+      ansible.builtin.debug:
         msg: "wazuh-install-files.tar introuvable, récupère les credentials manuellement sur l'instance."
       when: tar_file.files | length == 0
 
     - name: Affichage des credentials Wazuh
-      debug:
+      ansible.builtin.debug:
         msg: "{{ wazuh_credentials.stdout_lines }}"
       when: tar_file.files | length > 0
 
+    - name: Téléchargement du script d'installation Tailscale
+      ansible.builtin.get_url:
+        url: https://tailscale.com/install.sh
+        dest: /tmp/tailscale-install.sh
+        mode: '0755'
+
     - name: Installation de Tailscale
-      shell: curl -fsSL https://tailscale.com/install.sh | sh
+      ansible.builtin.command: bash /tmp/tailscale-install.sh
       args:
-        executable: /bin/bash
+        creates: /usr/bin/tailscale
+      changed_when: true
 
     - name: Authentification Tailscale
-      command: tailscale up  --authkey={{ tailscale_authkey }} --accept-routes
+      ansible.builtin.command: tailscale up --authkey={{ tailscale_authkey }} --accept-routes
+      changed_when: true
