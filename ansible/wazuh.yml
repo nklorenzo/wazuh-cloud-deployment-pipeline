@@ -44,6 +44,7 @@
       register: wazuh_credentials
       when: tar_file.files | length > 0
       changed_when: false
+      # noqa: command-instead-of-module
 
     - name: Fichier de credentials introuvable
       ansible.builtin.debug:
