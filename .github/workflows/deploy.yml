@@ -17,18 +17,23 @@ on:
 
 env:
   AWS_REGION: eu-north-1
+  TF_VERSION: "1.15.8"
+
+permissions:
+  contents: read
 
 jobs:
   test:
     name: Validation du code
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Récupération du code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Configuration des credentials AWS
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v4.1.0
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -41,7 +46,9 @@ jobs:
           chmod 600 ~/.ssh/wazuh-key.pub
 
       - name: Installation de Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v3.1.2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Init
         run: terraform -chdir=terraform init
@@ -49,12 +56,8 @@ jobs:
       - name: Terraform Validate
         run: terraform -chdir=terraform validate
 
-      - name: Terraform Plan
-        run: terraform -chdir=terraform plan
-        if: ${{ github.event.inputs.action != 'destroy' }}
-
       - name: Installation d'Ansible et ansible-lint
-        run: pip install ansible ansible-lint
+        run: pip install ansible==10.7.0 ansible-lint==24.12.2
 
       - name: Vérification syntaxe du playbook
         run: ansible-playbook --syntax-check ansible/wazuh.yml -i ansible/inventory.ini
@@ -66,34 +69,51 @@ jobs:
     name: Terraform ${{ github.event.inputs.action || 'apply' }}
     runs-on: ubuntu-latest
     needs: test
+    timeout-minutes: 30
 
     steps:
       - name: Récupération du code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Configuration des credentials AWS
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v4.1.0
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Configuration de la clé SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
       - name: Configuration de la clé SSH publique
         run: |
-          mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/wazuh-key.pub
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/wazuh-key
-          chmod 600 ~/.ssh/wazuh-key
+          chmod 600 ~/.ssh/wazuh-key.pub
 
       - name: Installation de Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v3.1.2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Init
         run: terraform -chdir=terraform init
 
+      - name: Terraform Plan
+        if: ${{ github.event.inputs.action != 'destroy' }}
+        run: terraform -chdir=terraform plan -out=tfplan
+
+      - name: Sauvegarde du plan Terraform
+        if: ${{ github.event.inputs.action != 'destroy' }}
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: tfplan
+          path: terraform/tfplan
+
       - name: Terraform Apply
         if: ${{ github.event.inputs.action != 'destroy' }}
-        run: terraform -chdir=terraform apply -auto-approve
+        run: terraform -chdir=terraform apply -auto-approve tfplan
 
       - name: Terraform Destroy
         if: ${{ github.event.inputs.action == 'destroy' }}
@@ -101,7 +121,7 @@ jobs:
 
       - name: Sauvegarde de l'inventaire Ansible
         if: ${{ github.event.inputs.action != 'destroy' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: ansible-inventory
           path: ansible/inventory.ini
@@ -111,25 +131,25 @@ jobs:
     runs-on: ubuntu-latest
     needs: terraform
     if: ${{ github.event.inputs.action != 'destroy' }}
+    timeout-minutes: 60
 
     steps:
       - name: Récupération du code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Récupération de l'inventaire généré
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.8
         with:
           name: ansible-inventory
           path: ansible/
 
       - name: Installation d'Ansible
-        run: pip install ansible
+        run: pip install ansible==10.7.0
 
       - name: Configuration de la clé SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/wazuh-key
-          chmod 600 ~/.ssh/wazuh-key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Création du fichier vault
         run: |
