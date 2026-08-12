@@ -58,6 +58,15 @@
         msg: "{{ wazuh_credentials.stdout_lines }}"
       when: tar_file.files | length > 0
 
+    - name: Déploiement des règles locales Wazuh
+      ansible.builtin.template:
+        src: templates/local_rules.xml.j2
+        dest: /var/ossec/etc/rules/local_rules.xml
+        owner: root
+        group: wazuh
+        mode: '0640'
+      notify: Redémarrer Wazuh Manager
+
     - name: Téléchargement du script d'installation Tailscale
       ansible.builtin.get_url:
         url: https://tailscale.com/install.sh
