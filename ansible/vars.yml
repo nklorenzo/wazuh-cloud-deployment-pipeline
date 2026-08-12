@@ -1,0 +1,4 @@
+---
+# Variables de configuration Wazuh
+agent_monitored_dir_site1: /home/nklorenzo/Downloads
+agent_monitored_dir_site2: /home/nklorenzo/Downloads

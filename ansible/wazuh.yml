@@ -2,6 +2,8 @@
 - name: Installation de Wazuh tout-en-un
   hosts: wazuh
   become: true
+  vars_files:
+    - vars.yml
 
   tasks:
     - name: Installation des dépendances
@@ -76,6 +78,40 @@
       ansible.builtin.template:
         src: templates/ossec.conf.j2
         dest: /var/ossec/etc/ossec.conf
+        owner: root
+        group: wazuh
+        mode: '0640'
+      notify: Redémarrer Wazuh Manager
+
+    - name: Création du groupe d'agents SITE-2
+      ansible.builtin.file:
+        path: /var/ossec/etc/shared/SITE-2
+        state: directory
+        owner: root
+        group: wazuh
+        mode: '0750'
+
+    - name: Déploiement de la configuration partagée des agents (agent.conf) SITE-2
+      ansible.builtin.template:
+        src: templates/agent_site2.conf.j2
+        dest: /var/ossec/etc/shared/SITE-2/agent.conf
+        owner: root
+        group: wazuh
+        mode: '0640'
+      notify: Redémarrer Wazuh Manager
+
+    - name: Création du groupe d'agents SITE-1
+      ansible.builtin.file:
+        path: /var/ossec/etc/shared/SITE-1
+        state: directory
+        owner: root
+        group: wazuh
+        mode: '0750'
+
+    - name: Déploiement de la configuration partagée des agents (agent.conf) SITE-1
+      ansible.builtin.template:
+        src: templates/agent_site1.conf.j2
+        dest: /var/ossec/etc/shared/SITE-1/agent.conf
         owner: root
         group: wazuh
         mode: '0640'
