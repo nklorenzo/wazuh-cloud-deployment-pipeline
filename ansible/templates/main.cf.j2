@@ -1,0 +1,41 @@
+# See /usr/share/postfix/main.cf.dist for a commented, more complete version
+compatibility_level = 3.9
+
+myorigin = /etc/mailname
+
+smtpd_banner = $myhostname ESMTP $mail_name (Ubuntu)
+
+inet_protocols = ipv4
+
+mynetworks_style = host
+mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128
+
+mydestination = $myhostname, {{ ansible_hostname }}, localhost.{{ ansible_domain }}, localhost
+
+mailbox_size_limit = 0
+mailbox_command =
+
+alias_maps = hash:/etc/aliases
+alias_database = hash:/etc/aliases
+
+biff = no
+recipient_delimiter = +
+
+cyrus_sasl_config_path = /etc/postfix/sasl
+
+smtpd_tls_key_file = /etc/ssl/private/ssl-cert-snakeoil.key
+smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem
+
+smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+smtpd_relay_restrictions = permit_mynetworks permit_sasl_authenticated defer_unauth_destination
+
+myhostname = {{ ansible_fqdn }}
+inet_interfaces = all
+
+relayhost = [smtp.gmail.com]:587
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+smtp_sasl_security_options = noanonymous
+smtp_tls_security_level = encrypt
+smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt

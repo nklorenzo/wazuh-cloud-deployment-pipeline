@@ -154,6 +154,10 @@ jobs:
       - name: Création du fichier vault
         run: |
           echo "tailscale_authkey: ${{ secrets.TAILSCALE_AUTHKEY }}" > ansible/vault.yml
+          echo "postfix_sasl_passwd: '${{ secrets.POSTFIX_SASL_PASSWD }}'" >> ansible/vault.yml
+          echo "virustotal_api_key: ${{ secrets.VIRUSTOTAL_API_KEY }}" >> ansible/vault.yml
+          echo "wazuh_email_from: ${{ secrets.WAZUH_EMAIL_FROM }}" >> ansible/vault.yml
+          echo "wazuh_email_to: ${{ secrets.WAZUH_EMAIL_TO }}" >> ansible/vault.yml
           ansible-vault encrypt ansible/vault.yml --vault-password-file <(echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}")
 
       - name: Exécution du playbook Wazuh
