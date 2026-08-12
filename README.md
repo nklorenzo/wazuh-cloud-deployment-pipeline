@@ -45,7 +45,7 @@ GitHub Actions
 
 ## Prérequis
 
-- Compte AWS avec les droits EC2, S3, DynamoDB
+- Compte AWS avec les droits EC2, S3
 - Clé SSH générée : `ssh-keygen -t ed25519 -f ~/.ssh/wazuh-key`
 - Secrets GitHub configurés (voir ci-dessous)
 
@@ -66,21 +66,11 @@ GitHub Actions
 
 ## Déploiement
 
-### Via CI/CD
 Chaque push sur `main` déclenche automatiquement le pipeline.
 
 Pour lancer manuellement :
 1. GitHub → Actions → Deploy Wazuh Infrastructure
 2. Run workflow → choisir `apply` ou `destroy`
-
-### En local
-```bash
-# Provisionner l'infra
-terraform -chdir=terraform apply
-
-# Installer Wazuh
-ansible-playbook -i ansible/inventory.ini ansible/wazuh.yml --ask-vault-pass -e @ansible/vault.yml
-```
 
 ## Accès au dashboard
 
