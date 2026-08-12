@@ -83,21 +83,6 @@
       ansible.builtin.command: tailscale up --authkey={{ tailscale_authkey }} --accept-routes
       changed_when: true
 
-    - name: Configuration de rsyslog pour recevoir les logs OPNsense
-      ansible.builtin.copy:
-        content: |
-          # Réception des logs syslog UDP
-          $ModLoad imudp
-          $UDPServerRun 514
-          # Logs OPNsense vers fichier dédié
-          if $fromhost-ip == '{{ opnsense_ip }}' then /var/log/opnsense.log
-          & stop
-        dest: /etc/rsyslog.d/opnsense.conf
-        owner: root
-        group: root
-        mode: '0644'
-      notify: Redémarrer rsyslog
-
     - name: Déploiement de la configuration Wazuh (ossec.conf)
       ansible.builtin.template:
         src: templates/ossec.conf.j2
@@ -185,9 +170,4 @@
     - name: Redémarrer Postfix
       ansible.builtin.systemd:
         name: postfix
-        state: restarted
-
-    - name: Redémarrer rsyslog
-      ansible.builtin.systemd:
-        name: rsyslog
         state: restarted
