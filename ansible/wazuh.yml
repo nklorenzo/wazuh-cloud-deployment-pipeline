@@ -67,6 +67,14 @@
         mode: '0640'
       notify: Redémarrer Wazuh Manager
 
+    - name: Déploiement du script de suppression des menaces (remove-threat)
+      ansible.builtin.template:
+        src: templates/remove-threat.sh.j2
+        dest: /var/ossec/active-response/bin/remove-threat.sh
+        owner: root
+        group: wazuh
+        mode: '0750'
+
     - name: Correction des permissions sur le dossier shared
       ansible.builtin.file:
         path: /var/ossec/etc/shared

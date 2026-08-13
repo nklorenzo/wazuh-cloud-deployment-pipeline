@@ -1,0 +1,34 @@
+#!/bin/bash
+# Wazuh - Active response script
+# Supprime les fichiers malveillants détectés par VirusTotal
+
+LOCAL=`dirname $0`;
+cd $LOCAL
+cd ../
+PWD=`pwd`
+
+read INPUT_JSON
+FILENAME=$(echo $INPUT_JSON | python3 -c 'import json,sys;o=json.load(sys.stdin);print(o["parameters"]["alert"]["data"]["virustotal"]["source"]["file"])')
+COMMAND=$(echo $INPUT_JSON | python3 -c 'import json,sys;o=json.load(sys.stdin);print(o["command"])')
+LOG_FILE="${PWD}/../logs/active-responses.log"
+
+if [ ${COMMAND} = "add" ]
+then
+    printf '{"version":1,"origin":{"name":"remove-threat","module":"active-response"},"command":"check_keys", "parameters":{"keys":[]}}\n'
+    read RESPONSE
+    COMMAND2=$(echo $RESPONSE | python3 -c 'import json,sys;o=json.load(sys.stdin);print(o["command"])')
+    if [ ${COMMAND2} != "continue" ]
+    then
+        echo "`date '+%Y/%m/%d %H:%M:%S'` $0: $INPUT_JSON Remove threat active response aborted" >> ${LOG_FILE}
+        exit 0;
+    fi
+fi
+
+rm -f "$FILENAME"
+if [ $? -eq 0 ]; then
+    echo "`date '+%Y/%m/%d %H:%M:%S'` $0: $INPUT_JSON Successfully removed threat" >> ${LOG_FILE}
+else
+    echo "`date '+%Y/%m/%d %H:%M:%S'` $0: $INPUT_JSON Error removing threat" >> ${LOG_FILE}
+fi
+
+exit 0;
