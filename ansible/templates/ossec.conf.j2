@@ -302,9 +302,22 @@
     <timeout_allowed>no</timeout_allowed>
   </command>
 
+  <command>
+    <name>remove-threat-win</name>
+    <executable>remove-threat.exe</executable>
+    <timeout_allowed>no</timeout_allowed>
+  </command>
+
   <active-response>
     <disabled>no</disabled>
     <command>remove-threat</command>
+    <location>local</location>
+    <rules_id>87105</rules_id>
+  </active-response>
+
+  <active-response>
+    <disabled>no</disabled>
+    <command>remove-threat-win</command>
     <location>local</location>
     <rules_id>87105</rules_id>
   </active-response>
