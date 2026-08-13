@@ -67,6 +67,15 @@
         mode: '0640'
       notify: Redémarrer Wazuh Manager
 
+    - name: Correction des permissions sur le dossier shared
+      ansible.builtin.file:
+        path: /var/ossec/etc/shared
+        state: directory
+        owner: wazuh
+        group: wazuh
+        mode: '0770'
+        recurse: true
+
     - name: Téléchargement du script d'installation Tailscale
       ansible.builtin.get_url:
         url: https://tailscale.com/install.sh
