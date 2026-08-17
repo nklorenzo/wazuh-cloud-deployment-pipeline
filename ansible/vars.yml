@@ -1,5 +1,5 @@
 ---
 # Variables de configuration Wazuh
-agent_monitored_dir_site1: /home/nklorenzo/Downloads
+agent_monitored_dir_site1: C:\Users\Administrator\Downloads
 agent_monitored_dir_site2: /home/nklorenzo/Downloads
 opnsense_ip: 100.79.146.36
