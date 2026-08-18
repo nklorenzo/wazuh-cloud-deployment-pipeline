@@ -8,11 +8,11 @@ resource "aws_security_group" "ssh_only" {
   description = "autoriser uniquement le trafic SSH"
 
   ingress {
-    description = "SSH"
+    description = "SSH via Tailscale uniquement"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["100.64.0.0/10"]
   }
 
 
