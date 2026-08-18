@@ -6,14 +6,18 @@
     - vars.yml
 
   tasks:
+    # ── Dépendances ──────────────────────────────────────────────────────────
     - name: Installation des dépendances
       ansible.builtin.apt:
         name:
           - curl
           - tar
+          - postfix
+          - libsasl2-modules
         state: present
         update_cache: true
 
+    # ── Installation Wazuh ───────────────────────────────────────────────────
     - name: Téléchargement du script d'installation Wazuh
       ansible.builtin.get_url:
         url: https://packages.wazuh.com/4.14/wazuh-install.sh
@@ -58,23 +62,7 @@
         msg: "{{ wazuh_credentials.stdout_lines }}"
       when: tar_file.files | length > 0
 
-    - name: Déploiement des règles locales Wazuh
-      ansible.builtin.template:
-        src: templates/local_rules.xml.j2
-        dest: /var/ossec/etc/rules/local_rules.xml
-        owner: root
-        group: wazuh
-        mode: '0640'
-      notify: Redémarrer Wazuh Manager
-
-    - name: Déploiement du script de suppression des menaces (remove-threat)
-      ansible.builtin.template:
-        src: templates/remove-threat.sh.j2
-        dest: /var/ossec/active-response/bin/remove-threat.sh
-        owner: root
-        group: wazuh
-        mode: '0750'
-
+    # ── Correction des permissions shared (avant tout déploiement) ───────────
     - name: Correction des permissions sur le dossier shared
       ansible.builtin.file:
         path: /var/ossec/etc/shared
@@ -84,6 +72,97 @@
         mode: '0770'
         recurse: true
 
+    # ── Configuration Wazuh ──────────────────────────────────────────────────
+    - name: Déploiement de la configuration Wazuh (ossec.conf)
+      ansible.builtin.template:
+        src: templates/ossec.conf.j2
+        dest: /var/ossec/etc/ossec.conf
+        owner: root
+        group: wazuh
+        mode: '0640'
+
+    - name: Déploiement des règles locales Wazuh
+      ansible.builtin.template:
+        src: templates/local_rules.xml.j2
+        dest: /var/ossec/etc/rules/local_rules.xml
+        owner: root
+        group: wazuh
+        mode: '0640'
+
+    - name: Déploiement du script de suppression des menaces (remove-threat.sh)
+      ansible.builtin.template:
+        src: templates/remove-threat.sh.j2
+        dest: /var/ossec/active-response/bin/remove-threat.sh
+        owner: root
+        group: wazuh
+        mode: '0750'
+
+    # ── Groupes agents ───────────────────────────────────────────────────────
+    - name: Création du groupe d'agents SITE-1
+      ansible.builtin.file:
+        path: /var/ossec/etc/shared/SITE-1
+        state: directory
+        owner: wazuh
+        group: wazuh
+        mode: '0770'
+
+    - name: Déploiement de la configuration partagée des agents SITE-1
+      ansible.builtin.template:
+        src: templates/agent_site1.conf.j2
+        dest: /var/ossec/etc/shared/SITE-1/agent.conf
+        owner: wazuh
+        group: wazuh
+        mode: '0660'
+
+    - name: Création du groupe d'agents SITE-2
+      ansible.builtin.file:
+        path: /var/ossec/etc/shared/SITE-2
+        state: directory
+        owner: wazuh
+        group: wazuh
+        mode: '0770'
+
+    - name: Déploiement de la configuration partagée des agents SITE-2
+      ansible.builtin.template:
+        src: templates/agent_site2.conf.j2
+        dest: /var/ossec/etc/shared/SITE-2/agent.conf
+        owner: wazuh
+        group: wazuh
+        mode: '0660'
+
+    # ── Redémarrage Wazuh après toutes les configs ───────────────────────────
+    - name: Redémarrage de Wazuh Manager
+      ansible.builtin.systemd:
+        name: wazuh-manager
+        state: restarted
+
+    # ── Postfix ──────────────────────────────────────────────────────────────
+    - name: Déploiement de la configuration Postfix (main.cf)
+      ansible.builtin.template:
+        src: templates/main.cf.j2
+        dest: /etc/postfix/main.cf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Création du fichier sasl_passwd
+      ansible.builtin.copy:
+        content: "{{ postfix_sasl_passwd }}"
+        dest: /etc/postfix/sasl_passwd
+        owner: root
+        group: root
+        mode: '0600'
+
+    - name: Génération de la base de données sasl_passwd
+      ansible.builtin.command: postmap /etc/postfix/sasl_passwd
+      changed_when: true
+
+    - name: Redémarrage de Postfix
+      ansible.builtin.systemd:
+        name: postfix
+        state: restarted
+
+    # ── Tailscale ────────────────────────────────────────────────────────────
     - name: Téléchargement du script d'installation Tailscale
       ansible.builtin.get_url:
         url: https://tailscale.com/install.sh
@@ -99,92 +178,3 @@
     - name: Authentification Tailscale
       ansible.builtin.command: tailscale up --authkey={{ tailscale_authkey }} --accept-routes
       changed_when: true
-
-    - name: Déploiement de la configuration Wazuh (ossec.conf)
-      ansible.builtin.template:
-        src: templates/ossec.conf.j2
-        dest: /var/ossec/etc/ossec.conf
-        owner: root
-        group: wazuh
-        mode: '0640'
-      notify: Redémarrer Wazuh Manager
-
-    - name: Création du groupe d'agents SITE-2
-      ansible.builtin.file:
-        path: /var/ossec/etc/shared/SITE-2
-        state: directory
-        owner: root
-        group: wazuh
-        mode: '0750'
-
-    - name: Déploiement de la configuration partagée des agents (agent.conf) SITE-2
-      ansible.builtin.template:
-        src: templates/agent_site2.conf.j2
-        dest: /var/ossec/etc/shared/SITE-2/agent.conf
-        owner: root
-        group: wazuh
-        mode: '0640'
-      notify: Redémarrer Wazuh Manager
-
-    - name: Création du groupe d'agents SITE-1
-      ansible.builtin.file:
-        path: /var/ossec/etc/shared/SITE-1
-        state: directory
-        owner: root
-        group: wazuh
-        mode: '0750'
-
-    - name: Déploiement de la configuration partagée des agents (agent.conf) SITE-1
-      ansible.builtin.template:
-        src: templates/agent_site1.conf.j2
-        dest: /var/ossec/etc/shared/SITE-1/agent.conf
-        owner: root
-        group: wazuh
-        mode: '0640'
-      notify: Redémarrer Wazuh Manager
-
-    - name: Installation de Postfix et dépendances mail
-      ansible.builtin.apt:
-        name:
-          - postfix
-          - libsasl2-modules
-        state: present
-
-    - name: Déploiement de la configuration Postfix (main.cf)
-      ansible.builtin.template:
-        src: templates/main.cf.j2
-        dest: /etc/postfix/main.cf
-        owner: root
-        group: root
-        mode: '0644'
-      notify: Redémarrer Postfix
-
-    - name: Création du fichier sasl_passwd
-      ansible.builtin.copy:
-        content: "{{ postfix_sasl_passwd }}"
-        dest: /etc/postfix/sasl_passwd
-        owner: root
-        group: root
-        mode: '0600'
-
-    - name: Génération de la base de données sasl_passwd
-      ansible.builtin.command: postmap /etc/postfix/sasl_passwd
-      changed_when: true
-
-    - name: Injection de la clé VirusTotal dans ossec.conf
-      ansible.builtin.replace:
-        path: /var/ossec/etc/ossec.conf
-        regexp: 'VIRUSTOTAL_API_KEY_PLACEHOLDER'
-        replace: "{{ virustotal_api_key }}"
-      notify: Redémarrer Wazuh Manager
-
-  handlers:
-    - name: Redémarrer Wazuh Manager
-      ansible.builtin.systemd:
-        name: wazuh-manager
-        state: restarted
-
-    - name: Redémarrer Postfix
-      ansible.builtin.systemd:
-        name: postfix
-        state: restarted
