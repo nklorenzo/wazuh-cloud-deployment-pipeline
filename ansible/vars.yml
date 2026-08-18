@@ -2,3 +2,7 @@
 # Variables de configuration Wazuh
 agent_monitored_dir_site1: "C:/Users/Administrator/Downloads"
 agent_monitored_dir_site2: /home/nklorenzo/Downloads
+
+# Configuration agents
+wazuh_manager_ip: "{{ hostvars['wazuh-manager']['ansible_host'] }}"
+agent_group: "default"
