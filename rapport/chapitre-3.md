@@ -610,27 +610,37 @@ jobs:
 **Listing 3.5 :** Pipeline CI/CD et injection des secrets (SMTP, VirusTotal, Tailscale, courriels)  
 **Source :** `.github/workflows/deploy.yml` (2026)
 
-Le job `test` précède tout changement d’infrastructure. Le vault éphémère relie BF-05 (identifiants SMTP et destinataires) et l’intégration VirusTotal au runtime Ansible. `permissions: contents: read` réduit le jeton du *runner*. `ssh-agent` évite d’écrire la clé privée sur disque en clair au-delà du magasin d’agent.
+Le job `test` précède tout changement d’infrastructure. Le vault éphémère relie BF-05 (identifiants SMTP et destinataires) et l’intégration VirusTotal au runtime Ansible. `permissions: contents: read` réduit le jeton du *runner*. `ssh-agent` évite d’écrire la clé privée sur disque en clair au-delà du magasin d’agent. Cette discipline de secrets conditionne la reproductibilité des expérimentations de la section 3.2 : sans relais Postfix authentifié et sans clé VirusTotal, ni le courriel SOC ni l’enrichissement FIM ne seraient démontrables.
 
 ---
 
 ## 3.2. Implémentation, tests de validation et cas d’usage
 
+La section 3.1 a fixé l’architecture. La présente section la confronte au banc d’essai. Nous déroulons d’abord le déploiement automatisé, tel que GitHub Actions l’exécute. Nous validons ensuite deux cas d’usage métier : la force brute SSH à Maroua et la surveillance d’intégrité à Yaoundé. Dans les deux cas, la réponse active locale et l’alerte courriel partent du même événement. Nous clôturons par une évaluation chiffrée de la posture avant/après.
+
 ### 3.2.1. Déroulement du déploiement automatisé
 
-Un `git push` sur `main` déclenche une chronologie déterministe. Nous la décrivons étape par étape, telle qu’elle s’exécute sur `ubuntu-latest`.
+Un `git push` sur `main` déclenche une chronologie déterministe. Un `workflow_dispatch` manuel permet de choisir `apply` ou `destroy`. Nous décrivons le chemin `apply` sur `ubuntu-latest`, région `eu-north-1`, Terraform 1.15.8, Ansible 10.7.0.
 
-**Étape 1 — Checkout et authentification.** Le *runner* clone le dépôt, configure les credentials AWS (`eu-north-1`) et charge la clé publique `wazuh-key.pub` depuis `SSH_PUBLIC_KEY`. Terraform lira ce fichier pour `aws_key_pair`.
+**Étape 1 — Checkout et authentification AWS/SSH.** Chaque job commence par `actions/checkout@v4.2.2`. L’action `aws-actions/configure-aws-credentials@v4.1.0` exporte `AWS_ACCESS_KEY_ID` et `AWS_SECRET_ACCESS_KEY` dans l’environnement du *runner*. Le secret `SSH_PUBLIC_KEY` est écrit dans `~/.ssh/wazuh-key.pub` (`chmod 600`). Terraform consomme ce fichier via `file("~/.ssh/wazuh-key.pub")` pour déclarer `aws_key_pair.wazuh_key`. Sans cette paire, l’EC2 naîtrait injoignable et le job Ansible échouerait.
 
-**Étape 2 — Job `test` (validation).** `terraform init` s’appuie sur le backend S3. `terraform validate` vérifie la cohérence du graphe de ressources. `ansible-playbook --syntax-check` et `ansible-lint` contrôlent `wazuh.yml`. Un échec de lint arrête le pipeline : aucun *apply* ne part d’un playbook invalide.
+**Étape 2 — Job `test` (validation, timeout 15 min).** `terraform -chdir=terraform init` initialise les providers AWS 6.54 et `local` 2.x, puis verrouille l’état distant dans le seau S3 `projet-stage-tfstate-336471570575` (clé `projet-stage/terraform.tfstate`, `encrypt = true`, `use_lockfile = true`). `terraform validate` vérifie le graphe de ressources sans appeler l’API de mutation. `pip install ansible==10.7.0 ansible-lint==24.12.2` installe la chaîne d’analyse. `ansible-playbook --syntax-check ansible/wazuh.yml -i ansible/inventory.ini` contrôle la grammaticalité YAML/Jinja2. `ansible-lint ansible/wazuh.yml` applique les règles FQCN, `changed_when` et modules. Un échec de lint arrête le pipeline (`needs: test` sur le job suivant) : aucun *apply* ne part d’un playbook invalide. Cette barrière réalise l’intégration continue de la sécurité au sens DevSecOps : on refuse de provisionner une configuration non lintée.
 
-**Étape 3 — Job `terraform` (provisionnement).** `terraform plan -out=tfplan` produit un plan binaire, archivé comme artefact. `terraform apply -auto-approve tfplan` crée ou converge l’EC2, le *security group* et la key pair. La ressource `local_file.ansible_inventory` matérialise `ansible/inventory.ini` avec l’IP publique et `ansible_user=ubuntu`. Cet inventaire est publié en artefact `ansible-inventory`. En mode `destroy`, le job détruit les ressources et s’arrête : le job Ansible est sauté (`if: action != 'destroy'`).
+**Étape 3 — Job `terraform` (provisionnement, timeout 30 min).** Le job répète checkout, credentials AWS et clé publique, puis charge `SSH_PRIVATE_KEY` dans `webfactory/ssh-agent@v0.9.0`. `terraform plan -out=tfplan` produit un plan binaire, archivé (`actions/upload-artifact`, nom `tfplan`). `terraform apply -auto-approve tfplan` crée ou converge trois ressources : la key pair, le *security group* `ssh-only` (22/TCP, 41641/UDP, egress any) et l’instance `m7i-flex.large` (AMI Ubuntu `ami-0aba19e56f3eaec05`, volume gp3 50 Go, tag `Name = wazuh`). La ressource `local_file.ansible_inventory` rend le template `inventory.tpl` : groupe `[wazuh]`, hôte `wazuh-manager`, `ansible_host` égal à l’IP publique, `ansible_user=ubuntu`, clé `~/.ssh/wazuh-key`, `StrictHostKeyChecking=no`. L’inventaire est publié en artefact `ansible-inventory`. En mode `destroy`, `terraform destroy -auto-approve` supprime les ressources ; le job `ansible` est sauté par `if: ${{ github.event.inputs.action != 'destroy' }}`.
 
-**Étape 4 — Job `ansible` (configuration).** Le *runner* récupère l’inventaire, installe Ansible 10.7.0, démarre `ssh-agent` avec `SSH_PRIVATE_KEY`, construit et chiffre `vault.yml`, puis lance le playbook. Le playbook enchaîne : paquets (`curl`, `tar`, `postfix`, `libsasl2-modules`) ; téléchargement de `wazuh-install.sh` 4.14 ; installation all-in-one si `/var/ossec/bin/wazuh-control` est absent (async 1800 s) ; extraction des mots de passe ; correction des permissions `shared/` ; déploiement de `ossec.conf`, `local_rules.xml`, `remove-threat.sh` ; création des groupes SITE-1/SITE-2 ; redémarrage de `wazuh-manager` ; configuration Postfix (`main.cf`, `sasl_passwd`, `postmap`) ; installation et authentification Tailscale.
+**Étape 4 — Job `ansible` (configuration, timeout 60 min).** Le *runner* télécharge l’inventaire dans `ansible/`, installe Ansible 10.7.0, réactive `ssh-agent`. Il matérialise `ansible/vault.yml` avec cinq secrets : `TAILSCALE_AUTHKEY`, `POSTFIX_SASL_PASSWD`, `VIRUSTOTAL_API_KEY`, `WAZUH_EMAIL_FROM`, `WAZUH_EMAIL_TO`. `ansible-vault encrypt` le chiffre avec `ANSIBLE_VAULT_PASSWORD`. Le playbook s’exécute :
 
-**Étape 5 — Enrôlement des agents GNS3.** Hors *runner*, nous installons l’agent sur chaque nœud Yaoundé/Maroua, avec l’IP Tailscale du manager et le groupe adéquat. L’agent apparaît dans le dashboard. La configuration FIM partagée arrive via `wazuh-remoted`. Les règles 503/504 notifient le SOC de la connexion ou de la coupure.
+```text
+ansible-playbook -i ansible/inventory.ini ansible/wazuh.yml \
+  --vault-password-file <(echo "$ANSIBLE_VAULT_PASSWORD") \
+  -e @ansible/vault.yml
+```
 
-**Étape 6 — Vérification de bout en bout.** Nous contrôlons : présence du nœud dans Tailscale ; agents `Active` ; envoi d’un courriel de test par alerte de niveau suffisant ; relais Postfix sans erreur SASL. La plateforme est alors prête pour les expérimentations.
+Les tâches s’enchaînent dans un ordre contraint. Apt installe `curl`, `tar`, `postfix` et `libsasl2-modules`. `get_url` pose `/tmp/wazuh-install.sh` (Wazuh 4.14, mode 0755). Un `stat` sur `/var/ossec/bin/wazuh-control` décide de lancer ou non `bash wazuh-install.sh -a` (async 1800 s, poll 30 s). Un `find` localise `wazuh-install-files.tar` ; `tar -O -xvf` extrait `wazuh-passwords.txt` pour affichage contrôlé. Les permissions de `/var/ossec/etc/shared` passent à `wazuh:wazuh` mode 0770, récursivement, avant tout déploiement de groupes : `wazuh-remoted` refuse sinon de servir `agent.conf`. Les templates `ossec.conf.j2`, `local_rules.xml.j2` et `remove-threat.sh.j2` sont posés (`0640` / `0750`). Les répertoires `shared/SITE-1` et `shared/SITE-2` reçoivent `agent.conf`. `systemd` redémarre `wazuh-manager` une seule fois, après toutes les configs. Postfix reçoit `main.cf.j2`, le fichier `sasl_passwd` (mode 0600), un `postmap`, puis un redémarrage. Tailscale s’installe via `install.sh` puis `tailscale up --authkey=... --accept-routes`.
+
+**Étape 5 — Enrôlement des agents GNS3.** Cette étape sort du *runner*. Sur le nœud Yaoundé (SITE-1) et sur le nœud Maroua (SITE-2), nous installons `wazuh-agent` 4.14 en définissant `WAZUH_MANAGER` à l’adresse Tailscale de l’EC2 — jamais à l’IPv4 publique — et `WAZUH_AGENT_GROUP` à `SITE-1` ou `SITE-2`. L’agent ouvre un canal 1514/TCP dans le mesh. Le manager le marque `Active`. `wazuh-remoted` pousse `agent.conf` (FIM temps réel du répertoire métier). Les règles **503** (agent démarré) et **504** (agent déconnecté) franchissent les blocs `<email_alerts>` dédiés : le SOC reçoit un courriel `full` à chaque jonction ou coupure, indépendamment du seuil global.
+
+**Étape 6 — Vérification de bout en bout.** Nous contrôlons cinq prédicats avant d’ouvrir les expérimentations. (i) `tailscale status` liste l’EC2 et les deux nœuds GNS3. (ii) Le dashboard affiche deux agents `Active`, groupes SITE-1 et SITE-2. (iii) `postqueue -p` est vide après un relais. (iv) Les journaux Postfix ne contiennent pas d’échec SASL vers `[smtp.gmail.com]:587`. (v) Une alerte de niveau suffisant produit un courriel dans la boîte `WAZUH_EMAIL_TO`. L’échec d’un seul prédicat invalide BF-04 ou BF-05.
 
 ```
 +-----------------------------------------------------------------------------------+
@@ -641,39 +651,41 @@ Un `git push` sur `main` déclenche une chronologie déterministe. Nous la décr
 **Figure 3.2 :** Exécution du pipeline d’intégration continue sur GitHub Actions  
 **Source :** Dépôt GitHub `nklorenzo/wazuh-cloud-deployment-pipeline` (2026)
 
-La durée observée d’un *apply* complet (validation, EC2, installation Wazuh) se compte en dizaines de minutes, dominée par le script `-a` (async 1800 s). Un *re-apply* après configuration déjà présente saute l’installation et se limite aux templates et redémarrages : l’idempotence du `stat` sur `wazuh-control` rend le pipeline réentrant.
+La durée d’un *apply* à froid se compte en dizaines de minutes. Le script `wazuh-install.sh -a` domine (plafond async 1800 s). Un *re-apply* sur instance déjà installée saute cette tâche grâce au `stat` de `wazuh-control`. Il ne redéploie que les templates, les groupes, Postfix et Tailscale, puis redémarre les services. Le pipeline est donc réentrant : on peut itérer sur `ossec.conf` ou `local_rules.xml` sans réinstaller le SIEM.
 
 ---
 
 ### 3.2.2. Expérimentation 1 : détection et réponse automatisée à une attaque par force brute SSH
 
+Cette expérimentation valide BF-02, BF-03 et BF-05 sur un stimulus réseau. La cible appartient à la succursale de Maroua. L’attaquant n’appartient pas au mesh Tailscale.
+
 #### 3.2.2.1. Protocole de simulation
 
-Nous plaçons l’attaquant sur un nœud GNS3 extérieur au LAN de Maroua. La cible est un poste client SITE-2 (`192.168.20.0/24`) exposant `sshd`. L’outil Hydra exécute une attaque par dictionnaire :
+Nous plaçons l’attaquant sur un nœud GNS3 extérieur au LAN `192.168.20.0/24`. La cible est un poste Linux SITE-2, agent Wazuh actif, service `sshd` en écoute. Le dictionnaire est un extrait contrôlé de `rockyou.txt`, suffisamment long pour franchir le seuil de fréquence des règles Wazuh, suffisamment court pour rester éthique en laboratoire.
 
 ```bash
 hydra -l admin -P rockyou-subset.txt ssh://192.168.20.10 -t 4 -W 1
 ```
 
-Chaque échec alimente `auth.log` / `journald`. L’agent Wazuh lit ces journaux et les transmet au manager par 1514/TCP encapsulé Tailscale.
+Hydra ouvre jusqu’à quatre sessions parallèles (`-t 4`) et attend une seconde entre les tentatives (`-W 1`). Chaque échec écrit une ligne `Failed password` dans `auth.log` et dans le journal systemd. L’agent Wazuh lit ces sources (`journald` et syslog). Il encapsule l’événement et l’envoie au manager sur 1514/TCP, à l’intérieur du tunnel WireGuard. L’IP source visible par `sshd` reste l’IP GNS3 de l’attaquant, pas une IP Tailscale : le DROP ultérieur filtrera donc le bon plan d’adressage.
 
 #### 3.2.2.2. Corrélation et alerte courriel
 
-Le moteur applique d’abord la règle **5710** (*sshd: authentication failed*, niveau 5). L’accumulation d’échecs depuis une même source déclenche la famille force brute. La règle **5712** (*sshd: brute force trying to get access to the system*, niveau 10) matérialise la corrélation générique. La règle **5763** (niveau 10) est celle que nous avons liée à l’active response dans `ossec.conf`. Le palier BF-05 (sévérité ≥ 10) est donc atteint.
+Le décodeur `sshd` extrait l’utilisateur, l’adresse source et le résultat. La règle **5710** (*sshd: authentication failed*, niveau 5) se lève à chaque échec. Elle est journalisée (`<log_alert_level>3</log_alert_level>`) mais ne déclenche pas, à elle seule, le palier métier BF-05. L’accumulateur de règles agrège ensuite les 5710 selon une fenêtre temporelle et une fréquence. Deux règles de niveau **10** en résultent. La règle **5712** (*sshd: brute force trying to get access to the system*) matérialise la corrélation générique. La règle **5763** (*sshd: brute force trying to get access to the system*, variante liée à l’IP) est celle que `ossec.conf` attache aux commandes `firewall-drop` et `netsh`. Le palier BF-05 (sévérité ≥ 10) est atteint dès 5763.
 
-`wazuh-maild` construit un message `full` : horodatage, hostname de l’agent Maroua, `srcip` de Hydra, `rule.id`, `rule.level`, extrait du log SSH. Postfix le relaye vers Gmail. L’analyste SOC reçoit le courriel **pendant** que l’active response s’exécute, et non après coup. Un second courriel suit lorsque la règle **601** confirme le blocage *firewall-drop*.
+`wazuh-maild` lit `<email_notification>yes</email_notification>`, `<smtp_server>localhost</smtp_server>` et `<email_alert_level>7</email_alert_level>`. Une alerte de niveau 10 franchit ce seuil. Le format `full` joint l’horodatage, le nom de l’agent Maroua, le `srcip` Hydra, `rule.id=5763`, `rule.level=10` et l’extrait du log SSH. Postfix, configuré en relais (`relayhost = [smtp.gmail.com]:587`, SASL, `smtp_tls_security_level = encrypt`), dépose le message chez Gmail. L’analyste SOC reçoit ce courriel **pendant** que l’active response s’exécute, et non après le timeout d’une heure. Un second courriel suit : la règle **601** (hôte bloqué par *firewall-drop*) est ciblée par un bloc `<email_alerts>` dédié, format `full`, indépendant du seuil global. La double notification (détection 5763, confirmation 601) fournit la traçabilité d’audit exigée par un SOC.
 
 #### 3.2.2.3. Active response `firewall-drop`
 
-Le manager envoie à l’agent cible la commande `firewall-drop` (`location=local`, `timeout=3600`). L’exécutable Wazuh insère une règle `iptables` :
+Dès 5763, le manager envoie à **l’agent victime** (`<location>local</location>`) la commande `firewall-drop`, timeout 3600 s. L’exécutable Wazuh insère en tête de `INPUT` :
 
 ```text
 iptables -I INPUT -s <IP_ATTAQUANT> -j DROP
 ```
 
-Le timeout de 3600 s programme le retrait automatique de la règle. L’attaquant cesse d’obtenir ne serait-ce qu’un banner SSH. Sur un agent Windows (SITE-1), le pendant `netsh` réalise le même confinement via le pare-feu local, conformément à la seconde balise `<active-response>` du listing 3.2.
+Le timeout programme le retrait automatique. Hydra cesse d’obtenir un banner SSH : les paquets SYN meurent sur le poste cible. Sur un agent Windows SITE-1, la seconde balise `<active-response>` invoque `netsh` (pare-feu local), même `rules_id`, même timeout. Les deux OS du parc GNS3 sont donc couverts par le même événement de corrélation.
 
-Nous vérifions trois artefacts. Le dashboard affiche l’alerte 5763 et l’événement 601. Le fichier `/var/ossec/logs/active-responses.log` de l’agent consigne l’exécution. La boîte mail du SOC contient le courriel enrichi. Hydra bascule en timeouts.
+Nous vérifions quatre artefacts, non trois. (i) Le dashboard indexe l’alerte 5763 et l’événement 601. (ii) `/var/ossec/logs/active-responses.log` de l’agent Maroua consigne l’exécution. (iii) `iptables -L INPUT -n` montre le DROP source. (iv) La boîte `WAZUH_EMAIL_TO` contient le courriel 5763 puis le courriel 601. Hydra bascule en timeouts. L’attaquant ne traverse plus `sshd`.
 
 ```
 +-----------------------------------------------------------------------------------+
@@ -684,31 +696,33 @@ Nous vérifions trois artefacts. Le dashboard affiche l’alerte 5763 et l’év
 **Figure 3.3 :** Détection d’attaque par force brute SSH et déclenchement d’Active Response  
 **Source :** Console Wazuh Dashboard (2026)
 
-Le MTTD observé se situe dans la fenêtre de corrélation (quelques secondes à quelques dizaines de secondes selon la cadence Hydra). Le MTTR jusqu’au DROP `iptables` reste inférieur à la minute. Ces grandeurs ne dépendent plus de la présence d’un opérateur devant le dashboard : BF-03 et BF-05 travaillent conjointement.
+Le MTTD observé coïncide avec la fenêtre de corrélation : quelques secondes à quelques dizaines de secondes selon la cadence Hydra (`-t`, `-W`). Le MTTR jusqu’au DROP reste inférieur à la minute. Ces grandeurs ne dépendent plus d’un opérateur devant le dashboard. BF-03 coupe la session. BF-05 réveille le SOC. Les deux partent du même `rule.id`.
 
 ---
 
 ### 3.2.3. Expérimentation 2 : surveillance d’intégrité (FIM), notification et confinement de l’hôte
 
+Cette expérimentation valide BF-02, BF-03 et BF-05 sur un stimulus fichier. Elle combine un indicateur de compromission système (binaire d’authentification) et un indicateur métier (dépôt dans Téléchargements, enrichi par VirusTotal).
+
 #### 3.2.3.1. Protocole de simulation
 
-Nous exerçons deux stimuli FIM sur le siège de Yaoundé (`192.168.10.0/24`) et, de manière symétrique, sur Maroua, afin de valider les deux groupes.
+Nous exerçons deux stimuli. Le premier vise Yaoundé (`192.168.10.0/24`). Le second est rejoué sur Maroua afin de prouver que les groupes SITE-1 et SITE-2 reçoivent bien des règles distinctes (100200/100201 versus 100202/100203).
 
-Le premier stimulus altère un binaire système Linux, ici `/usr/bin/login`, par une copie contrôlée en laboratoire. Le module `syscheck` de l’agent, qui surveille `/usr/bin` dans la configuration par défaut, calcule un nouveau hash SHA-256, produit un événement JSON FIM et l’envoie au manager. La règle **550** (*Integrity checksum changed*) s’élève. Cet événement représente une compromission de confiance du poste : un binaire d’authentification modifié est un indicateur de racine.
+**Stimulus A — altération de `/usr/bin/login`.** En laboratoire, nous remplaçons le binaire par une copie contrôlée de même nom. Le module `syscheck` de l’agent, qui surveille `/usr/bin` dans la configuration par défaut, recalcule le SHA-256. L’événement JSON FIM quitte l’agent vers le manager (1514/TCP, Tailscale). La règle **550** (*Integrity checksum changed*) se lève. Un binaire d’authentification modifié est un indicateur de racine : la confiance du poste sur le LAN s’effondre.
 
-Le second stimulus dépose ou modifie un fichier dans le répertoire métier surveillé en temps réel (`realtime="yes"`) : `C:/Users/Administrator/Downloads` (SITE-1) ou `/home/nklorenzo/Downloads` (SITE-2). Les règles locales **100200/100201** (SITE-1) et **100202/100203** (SITE-2), de niveau 7, se déclenchent. L’intégration VirusTotal interroge alors l’API sur l’empreinte. Une détection multi-moteurs lève la règle **87105**.
+**Stimulus B — fichier dans le répertoire métier temps réel.** Nous déposons ou modifions un fichier dans `C:/Users/Administrator/Downloads` (SITE-1, `agent_site1.conf.j2`, `realtime="yes"`, `report_changes="yes"`) ou dans `/home/nklorenzo/Downloads` (SITE-2, `agent_site2.conf.j2`). La règle locale **100200** (modification SITE-1, `if_sid` 550) ou **100201** (ajout SITE-1, `if_sid` 554), respectivement **100202** / **100203** pour SITE-2, se lève au niveau 7. L’intégration VirusTotal (`<rule_id>100200,100201,100202,100203</rule_id>`) interroge l’API sur l’empreinte. Une détection multi-moteurs lève la règle **87105**.
 
 #### 3.2.3.2. Détection, enrichissement et notification courriel
 
-L’événement FIM JSON contient le chemin, les hashes ancien/nouveau, la taille, l’agent et le nœud. Pour le répertoire métier, le niveau 7 franchit `<email_alert_level>`. Pour une détection VirusTotal, le niveau de 87105 dépasse largement le palier 10 du cahier des charges. Dans les deux cas, `wazuh-maild` émet un courriel `full` vers le SOC **en parallèle** de la réponse active. Le message cite le chemin (`data.syscheck.path` ou `data.virustotal.source.file`), le hash et l’identifiant de règle. L’analyste n’a pas à ouvrir le dashboard pour apprendre qu’un binaire a changé ou qu’un échantillon malveillant a été posé dans Téléchargements.
+L’événement FIM JSON porte le chemin, les hashes ancien et nouveau, la taille, l’identifiant d’agent et le nœud. Pour le répertoire métier, le niveau 7 franchit `<email_alert_level>7</email_alert_level>` : `wazuh-maild` émet déjà un courriel, avant même la réponse VirusTotal. Pour 87105, le niveau dépasse le palier métier ≥ 10 du cahier des charges. Dans les deux cas, le message `full` circule via Postfix (`localhost` → Gmail 587, SASL+TLS) **en parallèle** de la réponse active. Le corps cite `data.syscheck.path` ou `data.virustotal.source.file`, le hash et `rule.id`. L’analyste n’a pas le dashboard ouvert pour apprendre qu’un binaire a changé ou qu’un échantillon a été posé dans Téléchargements.
 
-Les règles **100092** et **100093** (niveau 12) ferment la boucle : succès ou échec de `remove-threat` à partir du journal d’active response. Elles génèrent à leur tour un courriel, puisque 12 ≥ 10.
+Les règles **100092** et **100093** (niveau 12, `if_sid` 657, motifs `Successfully removed threat` / `Error removing threat`) ferment la boucle à partir de `active-responses.log`. Elles génèrent à leur tour un courriel, puisque 12 ≥ 10. Le SOC dispose donc de trois classes de mails FIM : détection d’intégrité (100200–100203), verdict VirusTotal (87105), compte rendu de suppression (100092/100093).
 
 #### 3.2.3.3. Réponses actives : suppression de menace et isolement réseau
 
-**Suppression (règle 87105).** L’agent Linux exécute `remove-threat.sh`. Le script lit le JSON d’active response, extrait `parameters.alert.data.virustotal.source.file`, dialogue (`check_keys` / `continue`) puis `rm -f` le fichier. L’agent Windows exécute le pendant `remove-threat.exe` (logique Python durcie : refus des flux ADS, des liens symboliques et des *reparse points*). Le fichier malveillant disparaît du poste sans ticket manuel.
+**Suppression (règle 87105).** L’agent Linux exécute `/var/ossec/active-response/bin/remove-threat.sh` (`owner root`, `group wazuh`, mode 0750). Le script lit le JSON sur stdin, extraie `parameters.alert.data.virustotal.source.file` avec Python 3, émet un `check_keys`, attend `continue`, puis `rm -f` le fichier. Il journalise le succès ou l’échec dans `active-responses.log`. L’agent Windows exécute `remove-threat.exe` (logique Python durcie : refus des flux ADS `::`, des liens symboliques et des *reparse points*). Le fichier malveillant disparaît sans ticket manuel.
 
-**Isolement réseau de l’hôte (compromission d’intégrité critique).** Lorsque le FIM signale l’altération de `/usr/bin/login`, la suppression d’un fichier ne suffit plus : le poste lui-même n’est plus digne de confiance sur le LAN. Nous appliquons alors un confinement réseau local qui coupe le trafic métier tout en **maintenant le tunnel Tailscale** (`100.64.0.0/10` et l’interface `tailscale0`). Le principe du script `custom-isolate.sh`, invoqué en active response sur l’agent Linux, est le suivant :
+**Isolement réseau de l’hôte (stimulus A).** Lorsque 550 signale l’altération de `/usr/bin/login`, supprimer un fichier ne suffit plus. Le poste n’est plus digne de confiance sur `192.168.10.0/24`. Nous invoquons alors, en active response locale, le script `custom-isolate.sh`. Il pose une politique `iptables` DROP par défaut et **préserve le tunnel Tailscale** (`tailscale0`, préfixe `100.64.0.0/10`) afin que l’analyste conserve SSH et le canal d’administration.
 
 ```bash
 #!/bin/bash
@@ -721,10 +735,9 @@ iptables -I INPUT  -i lo -j ACCEPT
 iptables -I OUTPUT -o lo -j ACCEPT
 iptables -I INPUT  -i "$IF_TS" -j ACCEPT
 iptables -I OUTPUT -o "$IF_TS" -j ACCEPT
-# DHCP/ARP locaux éventuellement conservés selon le pont GNS3
 ```
 
-Le SOC conserve SSH ou l’UI d’administration via Tailscale. Le poste cesse de pivoter vers `192.168.10.0/24`. Cette séparation (plan de production coupé / plan d’administration préservé) est la traduction opérationnelle d’un isolement SOC sur un parc maillé WireGuard.
+Le poste cesse de pivoter vers le LAN de Yaoundé. Le SOC continue d’interroger l’agent via WireGuard. Cette séparation (plan de production coupé / plan d’administration préservé) est la traduction opérationnelle d’un isolement SOC sur un parc maillé. Le courriel 550/FIM part **en même temps** que le confinement : BF-05 n’attend pas la fin de la bascule `iptables`.
 
 ```
 +-----------------------------------------------------------------------------------+
@@ -735,13 +748,13 @@ Le SOC conserve SSH ou l’UI d’administration via Tailscale. Le poste cesse d
 **Figure 3.4 :** Notification FIM et isolement réseau de l’hôte compromis  
 **Source :** Console Wazuh Dashboard (2026)
 
-Le cas FIM démontre que BF-02 (corrélation *syscheck* + règles locales + VirusTotal), BF-03 (suppression et confinement) et BF-05 (courriel immédiat) s’exécutent sur le même événement, sans file d’attente humaine.
+Le cas FIM démontre que BF-02 (corrélation *syscheck*, règles 100200–100203, VirusTotal), BF-03 (suppression 87105 et confinement `custom-isolate.sh`) et BF-05 (courriel immédiat, niveaux 7, 10 et 12) s’exécutent sur le même stimulus, sans file d’attente humaine.
 
 ---
 
 ### 3.2.4. Synthèse des résultats et évaluation des performances
 
-La plateforme obtenue centralise deux sites émulés, détecte la force brute et l’altération de fichiers, répond localement et réveille le SOC par courriel. Le dashboard offre la vue d’ensemble de la posture : agents SITE-1 et SITE-2, volume d’alertes, FIM, réponses actives.
+La plateforme centralise deux sites émulés. Elle détecte la force brute et l’altération de fichiers. Elle répond localement. Elle réveille le SOC par courriel. Le dashboard unifie la vue : agents SITE-1 et SITE-2, volume d’alertes, FIM, réponses actives, état des nœuds.
 
 ```
 +-----------------------------------------------------------------------------------+
@@ -752,7 +765,7 @@ La plateforme obtenue centralise deux sites émulés, détecte la force brute et
 **Figure 3.5 :** Tableau de bord général de la posture de sécurité multi-sites  
 **Source :** Console Wazuh Dashboard (2026)
 
-Le tableau 3.1 compare l’état antérieur (supervision manuelle, sites cloisonnés, pas de pipeline) à l’état obtenu après déploiement.
+Le tableau 3.1 compare l’état antérieur — supervision manuelle, sites cloisonnés, pas de pipeline, pas de courriel SOC — à l’état obtenu après le déploiement automatisé et les deux expérimentations.
 
 ```
 +---------------------------+------------------------------+----------------------------------+
@@ -776,16 +789,16 @@ Le tableau 3.1 compare l’état antérieur (supervision manuelle, sites cloison
 **Tableau 3.1 :** Bilan comparatif avant / après mise en œuvre de la solution  
 **Source :** Nos travaux expérimentaux sur GNS3 et AWS (2026)
 
-Les gains de MTTD et de MTTR découlent de l’automatisation, non d’un surcroît d’effectifs. Le courriel (BF-05) n’améliore pas à lui seul le MTTD technique — la corrélation suffit — mais il améliore le **MTTN** (*Mean Time To Notify*) : l’humain est informé dans la même fenêtre que la machine. Sans BF-05, une réponse active silencieuse laisserait le SOC dans l’ignorance d’un DROP ou d’une suppression.
+Les gains de MTTD et de MTTR découlent de l’automatisation, non d’un surcroît d’effectifs. Nous mesurons le MTTD comme l’écart entre le premier paquet Hydra (ou la première écriture FIM) et l’indexation de l’alerte corrélée. Nous mesurons le MTTR comme l’écart entre cette alerte et l’effet observable (`iptables -L`, absence du fichier, perte de ping LAN). Le courriel (BF-05) n’améliore pas à lui seul le MTTD technique : la corrélation suffit. Il améliore le **MTTN** (*Mean Time To Notify*) : l’humain est informé dans la même fenêtre que la machine. Sans BF-05, une réponse active silencieuse laisserait le SOC dans l’ignorance d’un DROP ou d’une suppression. Avec BF-05, le SOC dispose d’un canal de réveil asynchrone, y compris hors du dashboard.
 
-**Valeur ajoutée pour SSN.** La plateforme sécurise d’abord le parc interne de l’entreprise d’accueil : deux sites, un SOC, une traçabilité courriel. Elle constitue ensuite un actif réutilisable pour les missions d’audit et de conseil. Un client SSN peut recevoir le même pipeline, avec d’autres secrets GitHub et d’autres groupes d’agents, sans réécrire l’architecture. Le dépôt Git devient un livrable commercial autant qu’un livrable académique. L’émulation GNS3 sert de banc de démonstration avant tout déploiement chez un client.
+**Valeur ajoutée pour SSN.** La plateforme sécurise d’abord le parc interne de l’entreprise d’accueil : siège de Yaoundé, succursale de Maroua, SOC unique, traçabilité courriel. Elle constitue ensuite un actif réutilisable pour les missions d’audit et de conseil. Un client SSN reçoit le même pipeline, d’autres secrets GitHub, d’autres groupes d’agents, sans réécriture d’architecture. Le dépôt Git est un livrable commercial autant qu’un livrable académique. L’émulation GNS3 sert de banc de démonstration avant tout déploiement chez un client : on montre Hydra, on montre le DROP, on montre le mail, on montre l’isolement, sans exposer le SIEM du client.
 
-Les limites demeurent assumées. L’all-in-one n’offre pas de HA manager/indexer. SSH CI ouvert sur `0.0.0.0/0` reste un compromis. L’enregistrement d’agents n’impose pas de mot de passe (`use_password=no`). Ces points relèvent d’un durcissement post-stage, non d’un échec des objectifs du chapitre.
+Les limites demeurent assumées. L’all-in-one n’offre pas de haute disponibilité manager/indexer. SSH CI ouvert sur `0.0.0.0/0` reste un compromis lié aux IPs éphémères des *runners*. L’enregistrement d’agents n’impose pas de mot de passe (`use_password=no`). Ces points relèvent d’un durcissement post-stage. Ils n’invalident pas l’atteinte des objectifs du chapitre sur le banc expérimental.
 
 ---
 
 ## Conclusion du chapitre 3
 
-Nous avons conçu et mis en œuvre une solution DevSecOps qui déploie un SIEM Wazuh dans le cloud, raccorde des nœuds *on-premises* émulés sous GNS3, automatise la détection-réponse et notifie le SOC par courriel. La section 1 a fixé le cahier des charges (BF-01 à BF-05, BNF-01 à BNF-04), la modélisation UML et l’architecture mesh Tailscale. La section 2 a montré qu’un `git push` suffit à reconstruire la plateforme, qu’une force brute Hydra à Maroua déclenche `firewall-drop` **et** un courriel de niveau 10, et qu’un événement FIM à Yaoundé déclenche enrichissement VirusTotal, suppression ou isolement **et** une notification parallèle.
+Nous avons conçu et mis en œuvre une solution DevSecOps qui déploie un SIEM Wazuh dans le cloud, raccorde des nœuds *on-premises* émulés sous GNS3, automatise la détection-réponse et notifie le SOC par courriel. La section 1 a fixé le cahier des charges (BF-01 à BF-05, BNF-01 à BNF-04), la modélisation UML et l’architecture mesh Tailscale, MTA Postfix compris. La section 2 a montré qu’un `git push` suffit à reconstruire la plateforme, qu’une force brute Hydra à Maroua déclenche `firewall-drop` **et** un courriel de niveau 10, et qu’un événement FIM à Yaoundé déclenche enrichissement VirusTotal, suppression ou isolement **et** une notification parallèle.
 
-Les objectifs d’ingénierie du stage — reproductibilité IaC, visibilité multi-sites, réponse automatique, alerte courriel — sont atteints sur le banc expérimental. Le chapitre suivant (conclusion générale) dressera le bilan global, les apports personnels et les perspectives de durcissement (mot de passe d’enrôlement, restriction SSH, haute disponibilité, réintégration éventuelle des journaux de pare-feu).
+Les objectifs d’ingénierie du stage — reproductibilité IaC, visibilité multi-sites, réponse automatique, alerte courriel — sont atteints sur le banc expérimental. Le chapitre suivant (conclusion générale) dressera le bilan global, les apports personnels et les perspectives de durcissement (mot de passe d’enrôlement, restriction SSH du *runner*, haute disponibilité, réintégration éventuelle des journaux de pare-feu).
