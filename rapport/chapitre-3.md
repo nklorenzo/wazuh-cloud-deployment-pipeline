@@ -13,30 +13,35 @@ Note de mise en page Word — Guide ISJ 2025 (à retirer du livrable) :
 - Exporter chaque bloc PlantUML en PNG (https://www.plantuml.com/plantuml).
 - Coller les captures dans les « ZONE D’INSERTION ».
 - Volume visé du chapitre 3 (Ingé 4) : 12 pages.
-- Page liminaire « Liste des abréviations » (page vi) : reporter AWS, CI/CD, DevSecOps,
-  FIM, GNS3, IaC, ISJ, LAN, MTA, MTTD, MTTN, MTTR, SIEM, SMTP, SOC, SSH,
-  SSN, UML, VPN.
+- Insérer ce chapitre dans rapport-de-stage.docx à la place du titre vide
+  « Chapitre 3 : Solution Proposée ».
+- Continuité des listes liminaires : Tableau I et II existent déjà ; numéroter ici
+  Tableau III.1 et III.2. Figure 1 existe déjà ; numéroter ici Figure 3.1 et suivantes.
+- Page liminaire « Liste des abréviations » : AWS, CI/CD, DevSecOps, EDR, FIM, GNS3,
+  IaC, ISJ, LAN, MTA, MTTD, MTTN, MTTR, RDP, SIEM, SMTP, SOC, SSH, SSN, UML, VPN.
 -->
 
-# CHAPITRE 3 : SOLUTION PROPOSÉE (CONCEPTION ET MISE EN ŒUVRE)
+# Chapitre 3 : Solution Proposée
 
 ## Introduction du chapitre
 
-Le présent chapitre propose la solution retenue pour le problème identifié au chapitre 2. Il constitue l’apport pratique du stage pour System Security Network sarl (SSN). Nous y concevons, déployons et validons une chaîne Development, Security and Operations (DevSecOps).
+Le chapitre 2 a diagnostiqué la Direction Technique de System Security Network (SSN). Les postes de travail du siège de Yaoundé et de la succursale de Maroua forment la surface d’attaque principale. Aucune liaison privée dédiée ne relie ces deux sites. Les journaux restent locaux. Le support est purement réactif. Le Mean Time To Detect (MTTD) se compte en semaines. Le Mean Time To Respond (MTTR) dépend d’un ticket utilisateur.
 
-Cette chaîne provisionne un Security Information and Event Management (SIEM) dans le cloud. Elle raccorde des nœuds sur site. Elle automatise la détection et la réponse. Elle notifie le Security Operations Center (SOC) par courriel.
+La même étude a fixé l’architecture cible. Le serveur central Security Information and Event Management (SIEM) Wazuh est déporté dans le cloud. Des agents légers restent sur les postes on-premises. Tailscale relie les sites par un réseau privé maillé WireGuard. Terraform, Ansible et GitHub Actions automatisent l’instanciation. Ce choix s’appuie sur l’analyse comparative d’Owolafe et James (2024), déjà présentée au tableau II : Wazuh surpasse Graylog et la pile Elasticsearch, Logstash, Kibana (ELK) pour le File Integrity Monitoring (FIM) et la réponse active native.
 
-Trois contraintes guident la conception. Premièrement, SSN doit centraliser la télémétrie de sites distants. Deuxièmement, le confinement ne doit plus dépendre de la seule présence humaine. Troisièmement, le déploiement doit rester reproductible et dépourvu de secrets en clair.
+Le présent chapitre concrétise cette architecture. Il constitue l’apport pratique du stage. Nous concevons, déployons et validons la chaîne Development, Security and Operations (DevSecOps) sur le banc de la Direction Technique.
 
-Nous répondons par une solution unique. Un pipeline GitHub Actions instancie Wazuh sur Amazon Web Services (AWS). Un maillage Tailscale, fondé sur WireGuard, masque les ports d’ingestion. Des réponses actives s’exécutent sur l’agent. Un Mail Transfer Agent (MTA) local achemine les alertes.
+Trois exigences, issues du chapitre 2, guident la conception. Premièrement, centraliser les journaux des endpoints Windows, Linux et macOS malgré l’absence de liaison inter-sites. Deuxièmement, détecter la force brute Secure Shell (SSH) / Remote Desktop Protocol (RDP) et les malwares, puis isoler l’hôte sans attendre l’utilisateur. Troisièmement, rendre le déploiement reproductible, sans secrets en clair.
 
-La démarche de modélisation est une conception par vues. Le langage de modélisation est Unified Modeling Language (UML). Nous utilisons trois diagrammes UML : cas d’utilisation, séquence et déploiement.
+Nous y ajoutons un Mail Transfer Agent (MTA) local. Il notifie le Security Operations Center (SOC) par courriel. Cette notification casse le modèle « intervention à la demande » décrit au chapitre 2.
 
-Le chapitre comporte deux sections, conformément au Guide de rédaction de l’Institut Saint Jean (ISJ). La section 3.1 analyse les besoins, modélise la solution en UML et décrit l’architecture. La section 3.2 présente le déploiement automatisé, puis deux expérimentations : force brute Secure Shell (SSH) et File Integrity Monitoring (FIM). Chaque expérimentation émet un courriel SOC en parallèle de la réponse active.
+La démarche de modélisation est une conception par vues. Le langage de modélisation est Unified Modeling Language (UML). Nous utilisons trois diagrammes : cas d’utilisation, séquence et déploiement.
+
+Le chapitre comporte deux sections, conformément au Guide de l’Institut Saint Jean (ISJ). La section 1 analyse les besoins, modélise la solution et décrit l’architecture. La section 2 présente le pipeline, puis deux expérimentations calées sur le diagnostic du chapitre 2 : force brute SSH à Maroua, et FIM / malware à Yaoundé. Chaque expérimentation émet un courriel SOC en parallèle de la réponse active.
 
 ---
 
-## 3.1. Analyse, modélisation et architecture de la solution
+## Section 1 : Analyse, modélisation et architecture de la solution
 
 Cette première section construit la solution avant tout provisionnement. Elle ouvre sur la démarche DevSecOps et le cahier des charges. Elle enchaîne avec la modélisation UML. Elle clôt sur l’architecture réseau et sur le dépôt Git.
 
@@ -46,7 +51,7 @@ Cette première section construit la solution avant tout provisionnement. Elle o
 
 La démarche retenue n’ajoute pas la sécurité *a posteriori*. Elle l’inscrit dans chaque étape du cycle de vie. Nous distinguons cinq phases qui s’enchaînent et se nourrissent mutuellement.
 
-**Planification.** Nous dérivons les exigences du contexte SSN : deux sites camerounais (siège de Yaoundé, succursale de Maroua), un SOC central, un besoin de réponse automatique et un besoin de notification asynchrone. Cette phase produit le cahier des charges (besoins fonctionnels BF-01 à BF-05 et besoins non fonctionnels BNF-01 à BNF-04) ainsi que le choix d’un SIEM all-in-one Wazuh 4.14, d’un provisionnement Terraform et d’une configuration Ansible.
+**Planification.** Nous partons du diagnostic de la Direction Technique. Le parc est hétérogène : serveurs applicatifs, Active Directory, postes Windows, Linux et macOS, répartis entre Yaoundé et Maroua sans liaison privée. Les besoins fonctionnels BF-01 à BF-05 et non fonctionnels BNF-01 à BNF-04 en découlent. Le SIEM retenu est Wazuh 4.14, conformément à Owolafe et James (2024). Terraform provisionne le manager cloud. Ansible configure le manager et les groupes d’agents. GitHub Actions orchestre le tout.
 
 **Infrastructure as Code (IaC).** Terraform déclare l’instance EC2, le *security group*, la paire de clés SSH et l’inventaire Ansible. L’état distant réside dans un seau S3 chiffré, avec verrouillage natif (`use_lockfile`). Aucune ressource AWS critique n’est créée à la main. Cette discipline élimine la dérive de configuration et rend le *destroy* aussi déterministe que l’*apply*.
 
@@ -62,17 +67,15 @@ Cette boucle Planifier–Provisionner–Configurer–Détecter–Répondre–Not
 
 Nous formulons cinq besoins fonctionnels. Chacun correspond à une capacité observable sur la plateforme déployée.
 
-**BF-01 — Ingestion centralisée.** Le manager Wazuh doit recevoir, sur le canal chiffré 1514/TCP, les événements des agents *on-premises* (journaux SSH, événements FIM *syscheck*, journaux de réponse active). L’enrôlement s’effectue sur 1515/TCP. Les adresses d’écoute publiques de ces ports restent masquées : les agents joignent le manager via l’IP Tailscale (`100.64.0.0/10`), jamais via l’IP publique AWS.
+**BF-01 — Ingestion centralisée.** Le manager Wazuh doit recevoir, sur le canal chiffré 1514/TCP, les événements des agents on-premises : journaux SSH et RDP, événements FIM (*syscheck*), journaux de réponse active. Cette centralisation répond au cloisonnement des logs décrit au chapitre 2. L’enrôlement s’effectue sur 1515/TCP. Les agents joignent le manager via l’adresse Tailscale (`100.64.0.0/10`), jamais via l’adresse publique AWS. Un malware qui efface les journaux locaux ne peut plus supprimer la copie déjà exportée.
 
 **BF-02 — Corrélation temps réel.** Le moteur de règles Wazuh doit agréger les échecs d’authentification SSH en une alerte de force brute, et transformer les événements FIM (ajout ou modification dans un répertoire surveillé) en alertes locales 100200 à 100203, ensuite enrichies par l’intégration VirusTotal.
 
-**BF-03 — Réponses actives automatisées.** Sur force brute, l’agent cible doit poser une règle de filtrage (`iptables` sous Linux, `netsh` sous Windows) bloquant l’IP attaquante pendant une heure. Sur détection VirusTotal positive, l’agent doit supprimer le fichier incriminé (`remove-threat.sh` / `remove-threat.exe`). Sur compromission d’intégrité critique, l’agent doit pouvoir isoler le poste tout en conservant le tunnel d’administration Tailscale.
+**BF-03 — Réponses actives automatisées.** Le chapitre 2 a établi l’absence de protocole d’Incident Response et l’incapacité d’isoler un hôte. Sur force brute SSH ou RDP, l’agent cible pose un filtre (`iptables` sous Linux, `netsh` sous Windows) pendant une heure. Sur détection VirusTotal positive, il supprime le fichier (`remove-threat.sh` / `remove-threat.exe`). Sur compromission d’intégrité critique, il isole le poste du Local Area Network (LAN) tout en conservant Tailscale, afin d’empêcher le déplacement latéral sans couper l’administration.
 
 **BF-04 — Visualisation unifiée.** Wazuh Dashboard doit présenter, en une console unique, les alertes des deux sites, l’état des agents, les résultats FIM et le suivi des réponses actives. L’analyste SOC n’ouvre pas de session distincte par site.
 
-**BF-05 — Notifications d’alertes automatiques par courriel.** Toute alerte de sévérité supérieure ou égale à 10, ainsi que les événements FIM enrichis et les confirmations de réponse active, doit produire un courriel à destination de l’équipe SOC. Le message circule via le MTA local (Postfix) relais SMTP authentifié. L’émission du courriel est **immédiate et parallèle** à la réponse active : le confinement ne retarde pas la notification, et la notification ne retarde pas le confinement.
-
-Le besoin BF-05 n’est pas un accessoire. Il couvre le cas où l’analyste n’a pas le tableau de bord ouvert. Il constitue le canal de réveil du SOC.
+**BF-05 — Notifications d’alertes automatiques par courriel.** Le chapitre 2 a montré que l’équipe n’intervient qu’à la demande de l’utilisateur. Toute alerte de sévérité supérieure ou égale à 10, ainsi que les événements FIM enrichis et les confirmations de réponse active, doit produire un courriel vers le SOC. Le message circule via le MTA local (Postfix), relais SMTP authentifié. L’émission est immédiate et parallèle à la réponse active. Le confinement ne retarde pas la notification. La notification ne retarde pas le confinement. Le SOC n’attend plus qu’un poste soit « bloqué » pour agir.
 
 #### 3.1.1.3. Cahier des charges non fonctionnel
 
@@ -102,7 +105,7 @@ Le tableau suivant synthétise la traçabilité exigence → mécanisme.
 +--------+-----------------------------------------------+---------------------------------------------+
 ```
 
-**Tableau 3.1 :** Traçabilité des besoins vers les mécanismes de la solution
+**Tableau III.1 :** Traçabilité des besoins vers les mécanismes de la solution
 
 ---
 
@@ -277,11 +280,11 @@ Le nœud GitHub Actions n’héberge aucun état durable. L’état d’infrastr
 
 ### 3.1.3. Architecture technique globale et réseau
 
-#### 3.1.3.1. Émulation réseau multi-sites sous GNS3
+#### 3.1.3.1. Reproduction laboratoire de la topologie multi-sites de SSN
 
-Le laboratoire SSN émule le parc réel sur GNS3. Deux LAN distincts reproduisent la séparation géographique. Le siège de Yaoundé occupe `192.168.10.0/24`. La succursale de Maroua occupe `192.168.20.0/24`. Un routage interne simule le WAN. Les postes clients portent l’agent Wazuh. Ils n’ouvrent pas de flux directs vers l’IP publique de l’EC2 pour l’ingestion SIEM.
+Le chapitre 2 a décrit le parc réel : siège à Yaoundé, succursale à Maroua, aucune liaison privée dédiée, deux réseaux locaux autonomes, chacun raccordé séparément à Internet. Le laboratoire de la Direction Technique reproduit cette topologie sous Graphical Network Simulator 3 (GNS3). Le LAN siège occupe `192.168.10.0/24`. Le LAN succursale occupe `192.168.20.0/24`. Aucune route privée n’est configurée entre eux, conformément au constat du chapitre 2. Les postes clients portent l’agent Wazuh. Ils n’ouvrent pas de flux d’ingestion vers l’adresse publique Amazon Web Services (AWS).
 
-Cette topologie a une vertu pédagogique et une vertu opérationnelle. Elle force le pipeline cloud à traiter de vrais agents distants, avec latence, NAT et coupure possible. Elle évite de tester le SIEM uniquement contre lui-même.
+Cette émulation n’est pas un exercice isolé. Elle force le pipeline cloud à traiter de vrais agents distants, avec translation d’adresses et coupure possible, exactement comme les deux implantations de SSN.
 
 ```
                     +---------------------------+
@@ -310,20 +313,20 @@ Cette topologie a une vertu pédagogique et une vertu opérationnelle. Elle forc
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.1 :** Topologie réseau émulée sous GNS3 (Siège et Succursale)  
-**Source :** Nos travaux sous GNS3 (2026)
+**Figure 3.1 :** Topologie réseau reproduisant le siège de Yaoundé et la succursale de Maroua  
+**Source :** Nos travaux sous GNS3, d’après le diagnostic du chapitre 2 (2026)
 
-Le mapping des groupes Wazuh suit l’organisation territoriale. Le groupe `SITE-1` pousse, via `/var/ossec/etc/shared/SITE-1/agent.conf`, la surveillance temps réel de `C:/Users/Administrator/Downloads`. Le groupe `SITE-2` pousse celle de `/home/nklorenzo/Downloads`. Les variables `agent_monitored_dir_site1` et `agent_monitored_dir_site2` dans `ansible/vars.yml` rendent ces chemins paramétrables sans modifier les templates.
+Les groupes Wazuh suivent l’organisation territoriale de SSN. Le groupe `SITE-1` correspond au siège (postes Windows). Il pousse, via `/var/ossec/etc/shared/SITE-1/agent.conf`, la surveillance temps réel de `C:/Users/Administrator/Downloads`. Le groupe `SITE-2` correspond à la succursale (postes Linux). Il pousse celle de `/home/nklorenzo/Downloads`. Ces répertoires sont le point d’entrée habituel d’un malware téléchargé, scénario identifié au chapitre 2. Les variables `agent_monitored_dir_site1` et `agent_monitored_dir_site2` dans `ansible/vars.yml` rendent les chemins paramétrables. L’agent Wazuh prend aussi en charge macOS ; le banc expérimental se concentre sur Windows et Linux, majoritaires dans le parc décrit au chapitre 2.
 
-#### 3.1.3.2. Réseau privé maillé Tailscale (WireGuard)
+#### 3.1.3.2. Réseau privé maillé Tailscale (WireGuard) : la liaison qui manquait
 
-Tailscale fournit le plan de contrôle. WireGuard fournit le plan de données. Chaque nœud (EC2, poste Yaoundé, poste Maroua, poste d’administration) reçoit une adresse du CGNAT `100.64.0.0/10`. Les paquets SIEM ne sortent jamais en clair sur le WAN simulé ni sur Internet.
+Le chapitre 2 a établi qu’aucune liaison privée ne relie Yaoundé, Maroua et un éventuel serveur de supervision. Tailscale fournit cette liaison. WireGuard chiffre le plan de données. Chaque nœud (instance cloud, poste Yaoundé, poste Maroua, poste d’administration) reçoit une adresse du CGNAT `100.64.0.0/10`. Les journaux SIEM ne transitent plus en clair sur Internet. Les deux sites restent autonomes sur leurs LAN. Ils partagent toutefois un plan d’administration et d’ingestion commun.
 
-Le playbook exécute `tailscale up --authkey=... --accept-routes`. L’authkey provient du secret `TAILSCALE_AUTHKEY`, injecté dans le vault Ansible au runtime. Le *security group* autorise 41641/UDP afin que le nœud EC2 établisse les sessions WireGuard, y compris derrière NAT.
+Le playbook exécute `tailscale up --authkey=... --accept-routes`. L’authkey provient du secret `TAILSCALE_AUTHKEY`. Le *security group* autorise 41641/UDP pour le NAT traversal.
 
-Le masquage des ports 1514/1515 en résulte directement. Un scan externe de l’IP publique EC2 ne révèle pas le service d’ingestion Wazuh. Un attaquant Internet ne peut pas s’enregistrer comme agent fantôme sur 1515 sans appartenir au mesh. Cette propriété satisfait BNF-01 et durcit BF-01.
+Le masquage des ports 1514 et 1515 en résulte. Un scan de l’adresse publique EC2 ne révèle pas l’ingestion Wazuh. Un attaquant Internet ne s’enregistre pas comme agent sur 1515 sans appartenir au mesh. Cette propriété satisfait BNF-01. Elle durcit BF-01. Elle répond aussi à la vulnérabilité « coupure au siège = cécité sur Maroua » du chapitre 2 : le manager cloud ne dépend plus de l’électricité du siège.
 
-L’accès au tableau de bord suit la même voie. Le README mentionne `https://<IP_INSTANCE>`. Le *security group* n’ouvre toutefois pas 443/TCP vers `0.0.0.0/0`. L’analyste SOC joint le dashboard via l’adresse Tailscale de l’instance. Cette décision est volontaire : elle évite d’exposer l’interface d’administration.
+L’analyste joint le tableau de bord via l’adresse Tailscale. Le *security group* n’ouvre pas 443/TCP vers `0.0.0.0/0`. L’interface d’administration n’est pas publique.
 
 #### 3.1.3.3. SIEM cloud Wazuh et MTA de notification
 
@@ -640,9 +643,9 @@ Le job `test` précède tout changement d’infrastructure. Le vault éphémère
 
 ---
 
-## 3.2. Implémentation, tests de validation et cas d’usage
+## Section 2 : Implémentation, tests de validation et cas d’usage
 
-Cette seconde section confronte l’architecture au banc d’essai. Elle déroule d’abord le déploiement automatisé. Elle valide ensuite deux cas d’usage : la force brute SSH à Maroua et la surveillance d’intégrité à Yaoundé. Dans les deux cas, la réponse active et l’alerte courriel partent du même événement. Elle clôt par une évaluation chiffrée, résumée dans le tableau 3.2.
+Cette seconde section confronte l’architecture au banc d’essai de la Direction Technique. Elle déroule d’abord le déploiement automatisé annoncé au chapitre 2 (Terraform, Ansible, GitHub Actions). Elle valide ensuite les deux familles de menaces du diagnostic : force brute SSH à Maroua, FIM et malware à Yaoundé. Dans les deux cas, la réponse active et l’alerte courriel partent du même événement. Elle clôt par une évaluation chiffrée, résumée dans le tableau III.2. Le MTTD et le MTTR y sont comparés aux « plusieurs semaines » et à l’intervention manuelle du chapitre 2.
 
 ### 3.2.1. Déroulement du déploiement automatisé
 
@@ -683,7 +686,7 @@ La durée d’un *apply* à froid se compte en dizaines de minutes. Le script `w
 
 ### 3.2.2. Expérimentation 1 : détection et réponse automatisée à une attaque par force brute SSH
 
-Cette expérimentation valide BF-02, BF-03 et BF-05 sur un stimulus réseau. La cible appartient à la succursale de Maroua. L’attaquant n’appartient pas au mesh Tailscale.
+Le chapitre 2 identifie deux vecteurs de force brute : SSH et RDP. Nous validons SSH sur un poste Linux de la succursale de Maroua. C’est le cas le plus direct pour la règle 5763 et `firewall-drop`. Sur un poste Windows du siège, la commande `netsh` réalise le confinement équivalent du pare-feu local. L’attaquant n’appartient pas au mesh Tailscale. Les échecs ne restent plus « confinés dans les fichiers locaux de la machine cible », selon les termes du chapitre 2.
 
 #### 3.2.2.1. Protocole de simulation
 
@@ -709,7 +712,7 @@ Dès 5763, le manager envoie à **l’agent victime** (`<location>local</locatio
 iptables -I INPUT -s <IP_ATTAQUANT> -j DROP
 ```
 
-Le timeout programme le retrait automatique. Hydra cesse d’obtenir un banner SSH : les paquets SYN meurent sur le poste cible. Sur un agent Windows SITE-1, la seconde balise `<active-response>` invoque `netsh` (pare-feu local), même `rules_id`, même timeout. Les deux OS du parc GNS3 sont donc couverts par le même événement de corrélation.
+Le timeout programme le retrait automatique. Hydra cesse d’obtenir un banner SSH. Sur un agent Windows SITE-1 (siège), la seconde balise `<active-response>` invoque `netsh`. Les deux familles d’endpoints du chapitre 2, Windows et Linux, sont donc couvertes.
 
 Nous vérifions quatre artefacts, non trois. (i) Le dashboard indexe l’alerte 5763 et l’événement 601. (ii) `/var/ossec/logs/active-responses.log` de l’agent Maroua consigne l’exécution. (iii) `iptables -L INPUT -n` montre le DROP source. (iv) La boîte `WAZUH_EMAIL_TO` contient le courriel 5763 puis le courriel 601. Hydra bascule en timeouts. L’attaquant ne traverse plus `sshd`.
 
@@ -732,7 +735,7 @@ Cette expérimentation valide BF-02, BF-03 et BF-05 sur un stimulus fichier. Ell
 
 #### 3.2.3.1. Protocole de simulation
 
-Nous exerçons deux stimuli. Le premier vise Yaoundé (`192.168.10.0/24`). Le second est rejoué sur Maroua afin de prouver que les groupes SITE-1 et SITE-2 reçoivent bien des règles distinctes (100200/100201 versus 100202/100203).
+Nous exerçons deux stimuli calés sur le chapitre 2. Le premier simule une compromission de binaire d’authentification. Le second simule le téléchargement d’un malware dans le répertoire Téléchargements, « point d’entrée » habituel décrit au diagnostic. Le premier vise Yaoundé (`192.168.10.0/24`). Le second est rejoué sur Maroua afin de prouver que SITE-1 et SITE-2 reçoivent des règles distinctes (100200/100201 versus 100202/100203).
 
 **Stimulus A — altération de `/usr/bin/login`.** En laboratoire, nous remplaçons le binaire par une copie contrôlée de même nom. Le module `syscheck` de l’agent, qui surveille `/usr/bin` dans la configuration par défaut, recalcule le SHA-256. L’événement JSON FIM quitte l’agent vers le manager (1514/TCP, Tailscale). La règle **550** (*Integrity checksum changed*) se lève. Un binaire d’authentification modifié est un indicateur de racine : la confiance du poste sur le LAN s’effondre.
 
@@ -746,9 +749,9 @@ Les règles **100092** et **100093** (niveau 12, `if_sid` 657, motifs `Successfu
 
 #### 3.2.3.3. Réponses actives : suppression de menace et isolement réseau
 
-**Suppression (règle 87105).** L’agent Linux exécute `/var/ossec/active-response/bin/remove-threat.sh` (`owner root`, `group wazuh`, mode 0750). Le script lit le JSON sur stdin, extraie `parameters.alert.data.virustotal.source.file` avec Python 3, émet un `check_keys`, attend `continue`, puis `rm -f` le fichier. Il journalise le succès ou l’échec dans `active-responses.log`. L’agent Windows exécute `remove-threat.exe` (logique Python durcie : refus des flux ADS `::`, des liens symboliques et des *reparse points*). Le fichier malveillant disparaît sans ticket manuel.
+**Suppression (règle 87105).** L’agent Linux exécute `/var/ossec/active-response/bin/remove-threat.sh` (`owner root`, `group wazuh`, mode 0750). Le script lit le JSON sur stdin, extrait `parameters.alert.data.virustotal.source.file` avec Python 3, émet un `check_keys`, attend `continue`, puis `rm -f` le fichier. Il journalise le succès ou l’échec dans `active-responses.log`. L’agent Windows exécute `remove-threat.exe` (logique Python durcie : refus des flux ADS `::`, des liens symboliques et des *reparse points*). Le fichier malveillant disparaît sans ticket manuel, contrairement au modèle réactif du chapitre 2.
 
-**Isolement réseau de l’hôte (stimulus A).** Lorsque 550 signale l’altération de `/usr/bin/login`, supprimer un fichier ne suffit plus. Le poste n’est plus digne de confiance sur `192.168.10.0/24`. Nous invoquons alors, en active response locale, le script `custom-isolate.sh`. Il pose une politique `iptables` DROP par défaut et **préserve le tunnel Tailscale** (`tailscale0`, préfixe `100.64.0.0/10`) afin que l’analyste conserve SSH et le canal d’administration.
+**Isolement réseau de l’hôte (stimulus A).** Le chapitre 2 a établi qu’une machine infectée ne subissait aucun isolement automatique et conservait une liberté de déplacement latéral. Lorsque 550 signale l’altération de `/usr/bin/login`, supprimer un fichier ne suffit plus. Nous invoquons, en active response locale, le script `custom-isolate.sh`. Il pose une politique `iptables` DROP par défaut et préserve le tunnel Tailscale (`tailscale0`, préfixe `100.64.0.0/10`). L’analyste conserve SSH. Le poste cesse de pivoter sur le LAN.
 
 ```bash
 #!/bin/bash
@@ -791,32 +794,32 @@ La plateforme centralise deux sites émulés. Elle détecte la force brute et l�
 **Figure 3.5 :** Tableau de bord général de la posture de sécurité multi-sites  
 **Source :** Console Wazuh Dashboard (2026)
 
-Le tableau 3.2 compare l’état antérieur — supervision manuelle, sites cloisonnés, pas de pipeline, pas de courriel SOC — à l’état obtenu après le déploiement automatisé et les deux expérimentations.
+Le tableau III.2 compare l’état antérieur, tel que diagnostiqué au chapitre 2, à l’état obtenu après le déploiement et les deux expérimentations.
 
 ```
 +---------------------------+------------------------------+----------------------------------+
-| Indicateur                | Avant (constat initial)      | Après (solution déployée)        |
+| Indicateur                | Avant (chapitre 2)           | Après (chapitre 3)               |
 +---------------------------+------------------------------+----------------------------------+
-| MTTD force brute SSH      | Heures à jours (revue logs)  | Secondes (corrélation 5763)      |
-| MTTR force brute          | Intervention manuelle        | < 1 min (iptables DROP, 3600 s)  |
-| MTTD FIM / malware        | Incertain, souvent nul       | Temps réel (syscheck + VT)       |
-| MTTR fichier malveillant  | Analyse manuelle             | Suppression auto (règle 87105)   |
-| Isolement hôte            | Débranchement physique       | Confinement iptables + Tailscale |
-| Temps de déploiement SIEM | Jours, opérations manuelles  | Pipeline GitHub Actions (diz. min)|
+| Liaison Yaoundé–Maroua    | Aucune liaison privée        | Mesh Tailscale / WireGuard       |
+| Centralisation des logs   | Journaux cloisonnés locaux   | Ingestion 1514 via Tailscale     |
+| MTTD force brute SSH/RDP  | Aucune alerte, aucun blocage | Secondes (règle 5763)            |
+| MTTR force brute          | Ticket utilisateur           | < 1 min (iptables / netsh, 3600 s)|
+| MTTD FIM / malware        | Plusieurs semaines           | Temps réel (syscheck + VT)       |
+| MTTR fichier malveillant  | Nettoyage superficiel        | Suppression auto (règle 87105)   |
+| Isolement hôte            | Aucun, déplacement latéral   | Confinement iptables + Tailscale |
+| Modèle d'intervention     | Réactif, à la demande        | Actif + courriel SOC             |
+| Temps de déploiement SIEM | Jours, opérations manuelles  | Pipeline GitHub Actions          |
 | Reproductibilité          | Dérive de configuration      | IaC Terraform + Ansible          |
-| Exposition réseau SIEM    | Ports d'admin souvent publics| Mesh WireGuard, 1514/1515 masqués|
-| Chiffrement transit       | Variable                     | WireGuard (Tailscale)            |
-| Secrets d'infrastructure  | Fichiers locaux, risque git  | GitHub Secrets + ansible-vault   |
-| Notification SOC          | Absente ou messagerie ad hoc | Courriel auto, seuil ≥ 10 et FIM |
-| Visualisation             | Journaux par machine         | Dashboard unique multi-sites     |
+| Exposition du SIEM        | Risque on-premises (ch. 2)   | Manager cloud, 1514/1515 masqués |
+| Notification SOC          | Absente                      | Courriel auto, seuil ≥ 10 et FIM |
 +---------------------------+------------------------------+----------------------------------+
 ```
 
-**Tableau 3.2 :** Bilan comparatif avant / après mise en œuvre de la solution
+**Tableau III.2 :** Bilan comparatif avant / après, en regard du diagnostic du chapitre 2
 
 Les gains de Mean Time To Detect (MTTD, en secondes) et de Mean Time To Respond (MTTR, en secondes) découlent de l’automatisation. Ils ne découlent pas d’un surcroît d’effectifs. Nous mesurons le MTTD entre le premier paquet Hydra, ou la première écriture FIM, et l’indexation de l’alerte. Nous mesurons le MTTR entre cette alerte et l’effet observable (`iptables -L`, absence du fichier, perte de ping sur le Local Area Network (LAN)). Le courriel (BF-05) n’améliore pas à lui seul le MTTD technique. La corrélation suffit. Il améliore le Mean Time To Notify (MTTN, en secondes) : l’humain est informé dans la même fenêtre que la machine. Sans BF-05, une réponse active silencieuse laisserait le SOC dans l’ignorance d’un DROP ou d’une suppression. Avec BF-05, le SOC dispose d’un canal de réveil asynchrone.
 
-**Valeur ajoutée pour SSN.** La plateforme sécurise d’abord le parc interne de l’entreprise d’accueil : siège de Yaoundé, succursale de Maroua, SOC unique, traçabilité courriel. Elle constitue ensuite un actif réutilisable pour les missions d’audit et de conseil. Un client SSN reçoit le même pipeline, d’autres secrets GitHub, d’autres groupes d’agents, sans réécriture d’architecture. Le dépôt Git est un livrable commercial autant qu’un livrable académique. L’émulation GNS3 sert de banc de démonstration avant tout déploiement chez un client. Hydra, le DROP, le courriel et l’isolement y sont montrés sans exposer le SIEM du client.
+**Valeur ajoutée pour SSN.** La plateforme sécurise d’abord le parc interne décrit au chapitre 1 : siège de Yaoundé, succursale de Maroua, Direction Technique. Elle répond à l’exigence de « gestion centralisée permettant la corrélation de tous les événements de sécurité provenant de sources multiples », déjà affichée dans les prestations cybersécurité de SSN. Elle constitue ensuite un actif réutilisable pour les missions d’audit, de tests d’intrusion et de conseil. Un client SSN reçoit le même pipeline, d’autres secrets GitHub, d’autres groupes d’agents. L’émulation GNS3 sert de banc de démonstration avant déploiement chez un client.
 
 Les limites demeurent assumées. L’all-in-one n’offre pas de haute disponibilité manager/indexer. SSH CI ouvert sur `0.0.0.0/0` reste un compromis lié aux IPs éphémères des *runners*. L’enregistrement d’agents n’impose pas de mot de passe (`use_password=no`). Ces points relèvent d’un durcissement post-stage. Ils n’invalident pas l’atteinte des objectifs du chapitre sur le banc expérimental.
 
@@ -824,8 +827,8 @@ Les limites demeurent assumées. L’all-in-one n’offre pas de haute disponibi
 
 ## Conclusion du chapitre 3
 
-Nous avons proposé une solution pratique, adaptée au problème de SSN. Un pipeline DevSecOps déploie un SIEM Wazuh dans le cloud. Il raccorde des nœuds sur site émulés sous GNS3. Il automatise la détection et la réponse. Il notifie le SOC par courriel.
+Nous avons proposé une solution pratique, adaptée au problème diagnostiqué au chapitre 2. Un pipeline DevSecOps déploie le SIEM Wazuh dans le cloud. Des agents restent sur les postes Yaoundé et Maroua. Tailscale fournit la liaison privée qui n’existait pas. Les réponses actives et le courriel SOC cassent le modèle réactif.
 
-La section 3.1 a fixé le cahier des charges, la démarche de modélisation UML et l’architecture. La section 3.2 a montré qu’un `git push` reconstruit la plateforme. Une force brute Hydra à Maroua déclenche `firewall-drop` et un courriel de niveau 10. Un événement FIM à Yaoundé déclenche l’enrichissement VirusTotal, la suppression ou l’isolement, et une notification parallèle.
+La section 1 a fixé le cahier des charges, la démarche UML et l’architecture. La section 2 a montré qu’un `git push` reconstruit la plateforme. Une force brute Hydra à Maroua déclenche `firewall-drop` et un courriel de niveau 10. Un événement FIM à Yaoundé déclenche VirusTotal, la suppression ou l’isolement, et une notification parallèle.
 
-Les objectifs d’ingénierie du stage sont atteints sur le banc expérimental. La reproductibilité par Infrastructure as Code (IaC), la visibilité multi-sites, la réponse automatique et l’alerte courriel sont démontrées. La conclusion générale dressera le bilan, les apports et les perspectives (mot de passe d’enrôlement, restriction SSH du *runner*, haute disponibilité). Les extraits de configuration trop longs figurent en annexe. On se référera, pour plus de détails, à l’annexe A.
+Les objectifs du stage sont atteints sur le banc expérimental. Le MTTD passe de plusieurs semaines à quelques secondes. Le MTTR ne dépend plus d’un ticket. La conclusion générale dressera le bilan, les apports et les perspectives. On se référera, pour les extraits de configuration trop longs, à l’annexe A.
