@@ -1,25 +1,44 @@
 <!--
-Note de mise en page Word (à retirer du livrable ISJ) :
-- Police : Times New Roman 12, interligne 1,5, marges 2,5 cm.
-- Exporter chaque bloc PlantUML (https://www.plantuml.com/plantuml) en PNG et remplacer le code par l’image.
-- Placer les captures GNS3 / GitHub Actions / Wazuh / courriel dans les « ZONE D’INSERTION ».
-- Titre et source des figures et tableaux restent SOUS le visuel, comme déjà rédigé.
-- Les listings de code deviennent des « Listing 3.x » avec légende sous le bloc.
+Note de mise en page Word — Guide ISJ 2025 (à retirer du livrable) :
+- Police : Times New Roman 12, non italique, texte noir, alignement justifié.
+- Interligne : 1,15 (et non 1,5). Retrait de première ligne : 1 cm.
+- Marges : 2,5 cm (haut, bas, gauche, droite). Pagination : bas à droite.
+- Impression recto uniquement. Titre jamais isolé en bas de page.
+- Figures et tableaux : centrés ; titre ET source SOUS l’élément.
+  Exception : un tableau construit par l’auteur n’exige pas de source (Guide, §5).
+- Un seul type de puce dans tout le rapport.
+- Sigles : dénomination complète puis sigle entre parenthèses.
+- Citations entre guillemets : en italique, jamais en gras.
+- Gras et soulignement : réservés aux titres.
+- Exporter chaque bloc PlantUML en PNG (https://www.plantuml.com/plantuml).
+- Coller les captures dans les « ZONE D’INSERTION ».
+- Volume visé du chapitre 3 (Ingé 4) : 12 pages.
+- Page liminaire « Liste des abréviations » (page vi) : reporter AWS, CI/CD, DevSecOps,
+  FIM, GNS3, IaC, ISJ, LAN, MTA, MTTD, MTTN, MTTR, SIEM, SMTP, SOC, SSH,
+  SSN, UML, VPN.
 -->
 
 # CHAPITRE 3 : SOLUTION PROPOSÉE (CONCEPTION ET MISE EN ŒUVRE)
 
 ## Introduction du chapitre
 
-Le présent chapitre matérialise le passage du cadre d’analyse à une architecture opératoire. Il constitue le cœur ingénierie du stage. Nous y concevons une chaîne DevSecOps complète. Cette chaîne provisionne un SIEM dans le cloud, raccorde des nœuds *on-premises* et automatise la détection-réponse. Elle notifie également le SOC par courriel.
+Le présent chapitre propose la solution retenue pour le problème identifié au chapitre 2. Il constitue l’apport pratique du stage pour System Security Network sarl (SSN). Nous y concevons, déployons et validons une chaîne Development, Security and Operations (DevSecOps).
 
-La problématique de départ impose trois contraintes simultanées. Premièrement, System Security Network sarl (SSN) doit centraliser la télémétrie de sites géographiquement distants. Deuxièmement, le délai entre l’événement malveillant et la première action de confinement doit cesser de dépendre de la seule présence humaine. Troisièmement, le déploiement lui-même doit rester reproductible, auditable et dépourvu de secrets en clair. Le chapitre répond à ces trois contraintes par une solution unique : un pipeline GitHub Actions qui instancie Wazuh sur Amazon Web Services (AWS), un maillage Tailscale/WireGuard qui masque les ports d’ingestion, et un jeu de réponses actives couplé à un agent de transport de messagerie (MTA) local.
+Cette chaîne provisionne un Security Information and Event Management (SIEM) dans le cloud. Elle raccorde des nœuds sur site. Elle automatise la détection et la réponse. Elle notifie le Security Operations Center (SOC) par courriel.
 
-Nous structurons le propos en deux sections principales. La **section 1** fixe la démarche DevSecOps, le cahier des charges, la modélisation UML et l’architecture technique, y compris l’arborescence du dépôt `nklorenzo/wazuh-cloud-deployment-pipeline`. La **section 2** décrit le déroulement du déploiement automatisé, puis valide la solution sur deux cas d’usage : l’attaque par force brute SSH et la surveillance d’intégrité des fichiers (FIM), chacun accompagné d’une alerte courriel enrichie émise en parallèle de la réponse active.
+Trois contraintes guident la conception. Premièrement, SSN doit centraliser la télémétrie de sites distants. Deuxièmement, le confinement ne doit plus dépendre de la seule présence humaine. Troisièmement, le déploiement doit rester reproductible et dépourvu de secrets en clair.
+
+Nous répondons par une solution unique. Un pipeline GitHub Actions instancie Wazuh sur Amazon Web Services (AWS). Un maillage Tailscale, fondé sur WireGuard, masque les ports d’ingestion. Des réponses actives s’exécutent sur l’agent. Un Mail Transfer Agent (MTA) local achemine les alertes.
+
+La démarche de modélisation est une conception par vues. Le langage de modélisation est Unified Modeling Language (UML). Nous utilisons trois diagrammes UML : cas d’utilisation, séquence et déploiement.
+
+Le chapitre comporte deux sections, conformément au Guide de rédaction de l’Institut Saint Jean (ISJ). La section 3.1 analyse les besoins, modélise la solution en UML et décrit l’architecture. La section 3.2 présente le déploiement automatisé, puis deux expérimentations : force brute Secure Shell (SSH) et File Integrity Monitoring (FIM). Chaque expérimentation émet un courriel SOC en parallèle de la réponse active.
 
 ---
 
 ## 3.1. Analyse, modélisation et architecture de la solution
+
+Cette première section construit la solution avant tout provisionnement. Elle ouvre sur la démarche DevSecOps et le cahier des charges. Elle enchaîne avec la modélisation UML. Elle clôt sur l’architecture réseau et sur le dépôt Git.
 
 ### 3.1.1. Démarche DevSecOps et cahier des charges
 
@@ -59,7 +78,7 @@ Le besoin BF-05 n’est pas un accessoire. Il couvre le cas où l’analyste n�
 
 **BNF-01 — Chiffrement VPN mesh (WireGuard/Tailscale).** Le trafic agent–manager et l’accès administrateur au tableau de bord empruntent un réseau privé maillé. Tailscale encapsule les flux dans WireGuard. Le *security group* AWS n’expose publiquement que SSH (22/TCP) pour le *runner* CI/CD et le port Tailscale (41641/UDP). Les ports 1514, 1515, 443 et 9200 demeurent injoignables depuis Internet.
 
-**BNF-02 — Légèreté des agents.** L’agent Wazuh s’exécute sur des machines émulées GNS3 aux ressources contraintes. La configuration partagée se limite à un complément FIM temps réel sur le répertoire métier. Elle n’impose pas de modules lourds (osquery, CIS-CAT) côté agent.
+**BNF-02 — Légèreté des agents.** L’agent Wazuh s’exécute sur des machines émulées Graphical Network Simulator 3 (GNS3) aux ressources contraintes. La configuration partagée se limite à un complément FIM temps réel sur le répertoire métier. Elle n’impose pas de modules lourds (osquery, CIS-CAT) côté agent.
 
 **BNF-03 — Haute disponibilité cloud.** Le manager, l’indexeur et le tableau de bord cohabitent sur une instance EC2 `m7i-flex.large` (région `eu-north-1`), volume racine gp3 de 50 Go. Le *backend* S3 préserve l’état Terraform. Le job `destroy` autorise la reconstruction propre. L’architecture all-in-one convient au périmètre du stage ; elle reste recréable en quelques minutes de pipeline.
 
@@ -83,14 +102,21 @@ Le tableau suivant synthétise la traçabilité exigence → mécanisme.
 +--------+-----------------------------------------------+---------------------------------------------+
 ```
 
-**Tableau 3.0 :** Traçabilité des besoins vers les mécanismes de la solution  
-**Source :** Nos travaux (2026)
+**Tableau 3.1 :** Traçabilité des besoins vers les mécanismes de la solution
 
 ---
 
-### 3.1.2. Diagrammes de modélisation UML
+### 3.1.2. Démarche de modélisation et langage UML
 
-La modélisation UML fige les responsabilités avant le provisionnement. Nous produisons trois vues : les cas d’utilisation (qui agit), la séquence de force brute (quand les messages s’échangent) et le déploiement (où les nœuds s’exécutent).
+Le Guide ISJ exige de rendre explicites la démarche de modélisation et le langage utilisé. La démarche est descendante. Nous partons des acteurs et des cas d’usage. Nous précisons ensuite l’ordre temporel des messages. Nous situons enfin les artefacts sur les nœuds physiques et émulés.
+
+Le langage est UML. UML fournit un vocabulaire graphique normalisé. Il permet au jury et à SSN de lire la solution sans entrer d’abord dans Terraform ou Ansible. Nous retenons trois diagrammes du cahier de conception :
+
+- le diagramme de cas d’utilisation, qui répond à la question « qui agit ? » ;
+- le diagramme de séquence, qui répond à la question « dans quel ordre les messages circulent-ils ? » ;
+- le diagramme de déploiement, qui répond à la question « où s’exécute chaque composant ? ».
+
+PlantUML produit ces vues à partir d’un texte versionné dans Git. Le schéma et le dépôt restent donc cohérents.
 
 #### 3.1.2.1. Diagramme de cas d’utilisation
 
@@ -616,7 +642,7 @@ Le job `test` précède tout changement d’infrastructure. Le vault éphémère
 
 ## 3.2. Implémentation, tests de validation et cas d’usage
 
-La section 3.1 a fixé l’architecture. La présente section la confronte au banc d’essai. Nous déroulons d’abord le déploiement automatisé, tel que GitHub Actions l’exécute. Nous validons ensuite deux cas d’usage métier : la force brute SSH à Maroua et la surveillance d’intégrité à Yaoundé. Dans les deux cas, la réponse active locale et l’alerte courriel partent du même événement. Nous clôturons par une évaluation chiffrée de la posture avant/après.
+Cette seconde section confronte l’architecture au banc d’essai. Elle déroule d’abord le déploiement automatisé. Elle valide ensuite deux cas d’usage : la force brute SSH à Maroua et la surveillance d’intégrité à Yaoundé. Dans les deux cas, la réponse active et l’alerte courriel partent du même événement. Elle clôt par une évaluation chiffrée, résumée dans le tableau 3.2.
 
 ### 3.2.1. Déroulement du déploiement automatisé
 
@@ -765,7 +791,7 @@ La plateforme centralise deux sites émulés. Elle détecte la force brute et l�
 **Figure 3.5 :** Tableau de bord général de la posture de sécurité multi-sites  
 **Source :** Console Wazuh Dashboard (2026)
 
-Le tableau 3.1 compare l’état antérieur — supervision manuelle, sites cloisonnés, pas de pipeline, pas de courriel SOC — à l’état obtenu après le déploiement automatisé et les deux expérimentations.
+Le tableau 3.2 compare l’état antérieur — supervision manuelle, sites cloisonnés, pas de pipeline, pas de courriel SOC — à l’état obtenu après le déploiement automatisé et les deux expérimentations.
 
 ```
 +---------------------------+------------------------------+----------------------------------+
@@ -786,12 +812,11 @@ Le tableau 3.1 compare l’état antérieur — supervision manuelle, sites cloi
 +---------------------------+------------------------------+----------------------------------+
 ```
 
-**Tableau 3.1 :** Bilan comparatif avant / après mise en œuvre de la solution  
-**Source :** Nos travaux expérimentaux sur GNS3 et AWS (2026)
+**Tableau 3.2 :** Bilan comparatif avant / après mise en œuvre de la solution
 
-Les gains de MTTD et de MTTR découlent de l’automatisation, non d’un surcroît d’effectifs. Nous mesurons le MTTD comme l’écart entre le premier paquet Hydra (ou la première écriture FIM) et l’indexation de l’alerte corrélée. Nous mesurons le MTTR comme l’écart entre cette alerte et l’effet observable (`iptables -L`, absence du fichier, perte de ping LAN). Le courriel (BF-05) n’améliore pas à lui seul le MTTD technique : la corrélation suffit. Il améliore le **MTTN** (*Mean Time To Notify*) : l’humain est informé dans la même fenêtre que la machine. Sans BF-05, une réponse active silencieuse laisserait le SOC dans l’ignorance d’un DROP ou d’une suppression. Avec BF-05, le SOC dispose d’un canal de réveil asynchrone, y compris hors du dashboard.
+Les gains de Mean Time To Detect (MTTD, en secondes) et de Mean Time To Respond (MTTR, en secondes) découlent de l’automatisation. Ils ne découlent pas d’un surcroît d’effectifs. Nous mesurons le MTTD entre le premier paquet Hydra, ou la première écriture FIM, et l’indexation de l’alerte. Nous mesurons le MTTR entre cette alerte et l’effet observable (`iptables -L`, absence du fichier, perte de ping sur le Local Area Network (LAN)). Le courriel (BF-05) n’améliore pas à lui seul le MTTD technique. La corrélation suffit. Il améliore le Mean Time To Notify (MTTN, en secondes) : l’humain est informé dans la même fenêtre que la machine. Sans BF-05, une réponse active silencieuse laisserait le SOC dans l’ignorance d’un DROP ou d’une suppression. Avec BF-05, le SOC dispose d’un canal de réveil asynchrone.
 
-**Valeur ajoutée pour SSN.** La plateforme sécurise d’abord le parc interne de l’entreprise d’accueil : siège de Yaoundé, succursale de Maroua, SOC unique, traçabilité courriel. Elle constitue ensuite un actif réutilisable pour les missions d’audit et de conseil. Un client SSN reçoit le même pipeline, d’autres secrets GitHub, d’autres groupes d’agents, sans réécriture d’architecture. Le dépôt Git est un livrable commercial autant qu’un livrable académique. L’émulation GNS3 sert de banc de démonstration avant tout déploiement chez un client : on montre Hydra, on montre le DROP, on montre le mail, on montre l’isolement, sans exposer le SIEM du client.
+**Valeur ajoutée pour SSN.** La plateforme sécurise d’abord le parc interne de l’entreprise d’accueil : siège de Yaoundé, succursale de Maroua, SOC unique, traçabilité courriel. Elle constitue ensuite un actif réutilisable pour les missions d’audit et de conseil. Un client SSN reçoit le même pipeline, d’autres secrets GitHub, d’autres groupes d’agents, sans réécriture d’architecture. Le dépôt Git est un livrable commercial autant qu’un livrable académique. L’émulation GNS3 sert de banc de démonstration avant tout déploiement chez un client. Hydra, le DROP, le courriel et l’isolement y sont montrés sans exposer le SIEM du client.
 
 Les limites demeurent assumées. L’all-in-one n’offre pas de haute disponibilité manager/indexer. SSH CI ouvert sur `0.0.0.0/0` reste un compromis lié aux IPs éphémères des *runners*. L’enregistrement d’agents n’impose pas de mot de passe (`use_password=no`). Ces points relèvent d’un durcissement post-stage. Ils n’invalident pas l’atteinte des objectifs du chapitre sur le banc expérimental.
 
@@ -799,6 +824,8 @@ Les limites demeurent assumées. L’all-in-one n’offre pas de haute disponibi
 
 ## Conclusion du chapitre 3
 
-Nous avons conçu et mis en œuvre une solution DevSecOps qui déploie un SIEM Wazuh dans le cloud, raccorde des nœuds *on-premises* émulés sous GNS3, automatise la détection-réponse et notifie le SOC par courriel. La section 1 a fixé le cahier des charges (BF-01 à BF-05, BNF-01 à BNF-04), la modélisation UML et l’architecture mesh Tailscale, MTA Postfix compris. La section 2 a montré qu’un `git push` suffit à reconstruire la plateforme, qu’une force brute Hydra à Maroua déclenche `firewall-drop` **et** un courriel de niveau 10, et qu’un événement FIM à Yaoundé déclenche enrichissement VirusTotal, suppression ou isolement **et** une notification parallèle.
+Nous avons proposé une solution pratique, adaptée au problème de SSN. Un pipeline DevSecOps déploie un SIEM Wazuh dans le cloud. Il raccorde des nœuds sur site émulés sous GNS3. Il automatise la détection et la réponse. Il notifie le SOC par courriel.
 
-Les objectifs d’ingénierie du stage — reproductibilité IaC, visibilité multi-sites, réponse automatique, alerte courriel — sont atteints sur le banc expérimental. Le chapitre suivant (conclusion générale) dressera le bilan global, les apports personnels et les perspectives de durcissement (mot de passe d’enrôlement, restriction SSH du *runner*, haute disponibilité, réintégration éventuelle des journaux de pare-feu).
+La section 3.1 a fixé le cahier des charges, la démarche de modélisation UML et l’architecture. La section 3.2 a montré qu’un `git push` reconstruit la plateforme. Une force brute Hydra à Maroua déclenche `firewall-drop` et un courriel de niveau 10. Un événement FIM à Yaoundé déclenche l’enrichissement VirusTotal, la suppression ou l’isolement, et une notification parallèle.
+
+Les objectifs d’ingénierie du stage sont atteints sur le banc expérimental. La reproductibilité par Infrastructure as Code (IaC), la visibilité multi-sites, la réponse automatique et l’alerte courriel sont démontrées. La conclusion générale dressera le bilan, les apports et les perspectives (mot de passe d’enrôlement, restriction SSH du *runner*, haute disponibilité). Les extraits de configuration trop longs figurent en annexe. On se référera, pour plus de détails, à l’annexe A.
