@@ -82,7 +82,7 @@ Le tableau III.1 relie chaque besoin à sa réponse. Ce n’est pas un catalogue
 | Code   | Ce que SSN doit obtenir          | Comment la solution y répond              |
 +--------+----------------------------------+-------------------------------------------+
 | BF-01  | Traces centralisées              | Agents locaux, serveur dans le nuage      |
-| BF-02  | Alerte dès que le motif est clair| Corrélation (force brute, intégrité)      |
+| BF-02  | Alerte dès que le motif est clair| Corrélation, puis VirusTotal si fichier      |
 | BF-03  | Action sans attendre l’humain    | Blocage, suppression, isolement           |
 | BF-04  | Vue unique des deux sites        | Tableau de bord unique                    |
 | BF-05  | Réveil de l’équipe               | Courriel automatique                      |
@@ -184,28 +184,30 @@ Cette lecture prépare la section 2. L’essai de Maroua n’invente pas un autr
 
 #### 3.1.2.3. Diagramme de séquence d’une détection de logiciel malveillant
 
-Le second diagramme de séquence traite l’autre menace du chapitre 2. Un fichier arrive, souvent par téléchargement. Rien ne le voyait. Il s’exécutait. Parfois, il effaçait les traces. Ici, le poste signale le changement. Le serveur interroge un service d’analyse d’empreintes. Si le verdict est dangereux, deux flèches partent encore ensemble : ôter le fichier, et prévenir l’équipe.
+Le second diagramme de séquence traite l’autre menace du chapitre 2. Un fichier arrive, souvent par téléchargement. Rien ne le voyait. Il s’exécutait. Parfois, il effaçait les traces.
+
+Le contrôle d’intégrité, à lui seul, dit seulement qu’un fichier a changé. Il ne dit pas si ce fichier est malveillant. C’est le rôle de VirusTotal. VirusTotal est un service public d’analyse. Il compare l’empreinte du fichier à de nombreux moteurs antivirus. Le SIEM lui envoie cette empreinte, non le fichier entier. Si plusieurs moteurs s’accordent, VirusTotal renvoie un verdict dangereux. Alors seulement le serveur ordonne d’ôter le fichier et prévient l’équipe.
 
 ```plantuml
 @startuml
 actor "Attaquant" as A
 participant "Poste Yaoundé\n(agent local)" as P
 participant "Serveur SIEM\n(nuage)" as S
-participant "Analyse\nd'empreintes" as VT
+participant "VirusTotal\n(analyse d'empreintes)" as VT
 participant "Messagerie" as M
 actor "Analyste" as An
 
 A -> P : fichier déposé dans Téléchargements
 P -> S : trace de changement d'intégrité
-S -> VT : demande d'analyse
-VT --> S : verdict dangereux
+S -> VT : empreinte du fichier
+VT --> S : verdict (plusieurs moteurs)
 
 par
   S -> P : ordre d'ôter le fichier
   P -> P : suppression locale
   P --> S : succès ou échec
 else
-  S -> M : alerte
+  S -> M : alerte enrichie
   M -> An : courriel
 end
 
@@ -213,10 +215,12 @@ An -> S : consultation du tableau de bord
 @enduml
 ```
 
-**Figure 3.0c :** Diagramme de séquence d’une détection de malware, avec suppression locale et courriel parallèle  
+**Figure 3.0c :** Diagramme de séquence d’une détection de malware via VirusTotal, avec suppression locale et courriel parallèle  
 **Source :** Nos travaux, modélisation UML (2026)
 
-Lisons encore de haut en bas. L’attaquant dépose un fichier dans Téléchargements. L’agent voit le changement. Il l’envoie au serveur. Le serveur demande une analyse d’empreinte. Le verdict revient : dangereux. Deux flèches partent alors du même point. L’une redescend vers le poste : c’est l’ordre d’ôter le fichier. L’autre va vers la messagerie : c’est l’alerte. Le fragment parallèle dit, comme pour la force brute, que le courriel voyage pendant que le poste agit. Un dernier message peut dire si la suppression a réussi.
+Lisons encore de haut en bas. L’attaquant dépose un fichier dans Téléchargements. L’agent voit le changement. Il l’envoie au serveur. Le serveur interroge VirusTotal. VirusTotal compare l’empreinte. Il renvoie un verdict. Si le verdict est dangereux, deux flèches partent du même point. L’une redescend vers le poste : c’est l’ordre d’ôter le fichier. L’autre va vers la messagerie : c’est l’alerte, déjà enrichie par VirusTotal. Le fragment parallèle dit, comme pour la force brute, que le courriel voyage pendant que le poste agit. Un dernier message peut dire si la suppression a réussi.
+
+VirusTotal n’installe rien sur le poste. Il n’est pas un antivirus local. Il éclaire la décision du SIEM. Sans lui, tout nouveau fichier dans Téléchargements produirait la même alerte, qu’il soit bénin ou non. Avec lui, la suppression automatique ne part que lorsque plusieurs moteurs confirment le danger.
 
 Lorsque le changement touche un programme d’ouverture de session, ôter un fichier ne suffit plus. Le même schéma s’applique, mais l’ordre redescendu isole le poste du réseau local, tout en gardant le lien privé d’administration. L’essai de Yaoundé, en section 2, joue cette séquence sur le banc.
 
@@ -278,7 +282,7 @@ L’analyste ouvre le tableau de bord par ce même lien. L’écran d’administ
 
 La machine distante rassemble trois rôles. Elle reçoit les traces. Elle les range. Elle les affiche. Un relais de messagerie complète le dispositif. Le SIEM ne parle pas tout seul à Internet pour envoyer un mail. Il dépose le message chez ce relais. Le relais, une fois reconnu, l’achemine vers la boîte de l’équipe.
 
-Le seuil retenu envoie un courriel dès qu’un incident devient sérieux. Une attaque par mot de passe entre dans ce cas. Un fichier jugé malveillant aussi. Un changement dans Téléchargements prévient aussi, afin que l’analyse d’empreinte ne reste pas silencieuse. Les confirmations — poste bloqué, agent coupé — partent elles aussi. L’équipe suit le début et la fin de l’incident.
+Le seuil retenu envoie un courriel dès qu’un incident devient sérieux. Une attaque par mot de passe entre dans ce cas. Un fichier jugé malveillant aussi. Un changement dans Téléchargements prévient aussi, une fois VirusTotal consulté, afin que l’analyse d’empreinte ne reste pas silencieuse. Les confirmations — poste bloqué, agent coupé — partent elles aussi. L’équipe suit le début et la fin de l’incident.
 
 ---
 
@@ -360,7 +364,7 @@ Le chapitre 2 décrivait un second scénario. Un fichier malveillant arrive, sou
 
 Au siège, nous altérons, de façon contrôlée, un programme d’ouverture de session. Le contrôle d’intégrité recalcule l’empreinte du fichier. Le changement remonte au serveur. C’est un signal grave : la confiance dans le poste s’effondre.
 
-Nous déposons ensuite un fichier dans Téléchargements, à Yaoundé puis à Maroua. Chaque site a sa consigne. Le SIEM voit l’ajout ou la modification. Il interroge un service d’analyse d’empreintes. Si plusieurs moteurs s’accordent pour dire que le fichier est dangereux, une alerte plus forte s’élève.
+Nous déposons ensuite un fichier dans Téléchargements, à Yaoundé puis à Maroua. Chaque site a sa consigne. Le SIEM voit l’ajout ou la modification. Il envoie l’empreinte à VirusTotal. VirusTotal croise plusieurs moteurs. S’ils s’accordent pour dire que le fichier est dangereux, une alerte plus forte s’élève. La suppression part alors, comme sur la figure 3.0c.
 
 #### 3.2.3.2. Ce que l’équipe apprend par courriel
 
@@ -368,7 +372,7 @@ Le message décrit le chemin du fichier, l’ancienne et la nouvelle empreinte, 
 
 #### 3.2.3.3. Deux réponses, selon la gravité
 
-Si le fichier de Téléchargements est reconnu dangereux, l’agent l’efface. C’est la flèche gauche du même diagramme. Sous Windows, le même principe s’applique. Le ticket de dépannage n’est plus le premier geste.
+Si le fichier de Téléchargements est reconnu dangereux par VirusTotal, l’agent l’efface. C’est la flèche gauche du même diagramme. Sous Windows, le même principe s’applique. Le ticket de dépannage n’est plus le premier geste.
 
 Si c’est un programme d’ouverture de session qui a changé, ôter un fichier ne suffit plus. Le poste peut servir de tremplin. Nous demandons alors un isolement. Le poste cesse de parler à ses voisins. Il garde le lien privé d’administration. L’analyste l’interroge encore. Il ne se propage plus. C’est l’isolement qui manquait au chapitre 2.
 
