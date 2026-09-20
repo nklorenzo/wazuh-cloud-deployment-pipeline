@@ -5,7 +5,7 @@ Note Word — Guide ISJ 2025 (retirer avant impression) :
 - Titre et source SOUS chaque figure. Tableau d’auteur : pas de source.
 - Volume du chapitre 3 (Ingé 4) : 12 pages. Ne pas aérer ni condenser au-delà.
 - Coller dans rapport-de-stage.docx à la place du titre vide du chapitre 3.
-- Tableaux III.1 et III.2. Figures 3.1 à 3.5, plus 3.0a à 3.0c (UML).
+- Tableaux III.1 et III.2. Figures 3.1 à 3.5, plus 3.0a à 3.0d (UML).
 - Exporter les PlantUML en PNG. Détail de configuration : annexe A.
 -->
 
@@ -101,7 +101,7 @@ Le tableau III.1 relie chaque besoin à sa réponse. Ce n’est pas un catalogue
 
 Le Guide ISJ demande d’indiquer la méthode et le langage. Notre démarche descend. Nous partons des personnes et de leurs actes. Nous ordonnons ensuite les messages. Nous plaçons enfin chaque pièce sur une machine.
 
-UML fournit le dessin. Trois vues suffisent. La première répond à « qui fait quoi ? ». La deuxième, conservée et commentée ci-dessous, répond à « dans quel ordre ? ». La troisième répond à « où cela s’exécute-t-il ? ».
+UML fournit le dessin. Quatre vues suffisent. La première répond à « qui fait quoi ? ». Les deux suivantes, des diagrammes de séquence, répondent à « dans quel ordre ? » : l’une pour la force brute, l’autre pour le fichier dangereux. La dernière répond à « où cela s’exécute-t-il ? ».
 
 #### 3.1.2.1. Diagramme de cas d’utilisation
 
@@ -182,7 +182,45 @@ Lisons le schéma de haut en bas. L’attaquant envoie des essais. Le poste les 
 
 Cette lecture prépare la section 2. L’essai de Maroua n’invente pas un autre scénario. Il joue, sur le banc, exactement cette séquence.
 
-#### 3.1.2.3. Diagramme de déploiement
+#### 3.1.2.3. Diagramme de séquence d’une détection de logiciel malveillant
+
+Le second diagramme de séquence traite l’autre menace du chapitre 2. Un fichier arrive, souvent par téléchargement. Rien ne le voyait. Il s’exécutait. Parfois, il effaçait les traces. Ici, le poste signale le changement. Le serveur interroge un service d’analyse d’empreintes. Si le verdict est dangereux, deux flèches partent encore ensemble : ôter le fichier, et prévenir l’équipe.
+
+```plantuml
+@startuml
+actor "Attaquant" as A
+participant "Poste Yaoundé\n(agent local)" as P
+participant "Serveur SIEM\n(nuage)" as S
+participant "Analyse\nd'empreintes" as VT
+participant "Messagerie" as M
+actor "Analyste" as An
+
+A -> P : fichier déposé dans Téléchargements
+P -> S : trace de changement d'intégrité
+S -> VT : demande d'analyse
+VT --> S : verdict dangereux
+
+par
+  S -> P : ordre d'ôter le fichier
+  P -> P : suppression locale
+  P --> S : succès ou échec
+else
+  S -> M : alerte
+  M -> An : courriel
+end
+
+An -> S : consultation du tableau de bord
+@enduml
+```
+
+**Figure 3.0c :** Diagramme de séquence d’une détection de malware, avec suppression locale et courriel parallèle  
+**Source :** Nos travaux, modélisation UML (2026)
+
+Lisons encore de haut en bas. L’attaquant dépose un fichier dans Téléchargements. L’agent voit le changement. Il l’envoie au serveur. Le serveur demande une analyse d’empreinte. Le verdict revient : dangereux. Deux flèches partent alors du même point. L’une redescend vers le poste : c’est l’ordre d’ôter le fichier. L’autre va vers la messagerie : c’est l’alerte. Le fragment parallèle dit, comme pour la force brute, que le courriel voyage pendant que le poste agit. Un dernier message peut dire si la suppression a réussi.
+
+Lorsque le changement touche un programme d’ouverture de session, ôter un fichier ne suffit plus. Le même schéma s’applique, mais l’ordre redescendu isole le poste du réseau local, tout en gardant le lien privé d’administration. L’essai de Yaoundé, en section 2, joue cette séquence sur le banc.
+
+#### 3.1.2.4. Diagramme de déploiement
 
 Le dernier schéma situe les pièces. À gauche, l’installation automatique. Au centre, la machine du nuage, qui porte le SIEM, l’écran et la messagerie. À droite, les deux sites, reproduits en laboratoire, qui portent les agents. Le réseau privé relie le nuage et les postes.
 
@@ -202,7 +240,7 @@ MRA ..> SRV : traces chiffrées
 @enduml
 ```
 
-**Figure 3.0c :** Placement des composants entre le nuage et les deux sites  
+**Figure 3.0d :** Placement des composants entre le nuage et les deux sites  
 **Source :** Nos travaux, modélisation UML (2026)
 
 Les postes n’exposent pas le SIEM sur Internet. Ils parlent seulement par le lien privé. Le détail des fichiers figure en annexe A.
@@ -216,17 +254,6 @@ Les postes n’exposent pas le SIEM sur Internet. Ils parlent seulement par le l
 Le chapitre 2 a décrit le parc réel. Yaoundé d’un côté, Maroua de l’autre. Deux réseaux locaux autonomes. Chacun sort vers Internet de son côté. Aucun tunnel d’entreprise ne les relie.
 
 Le laboratoire de la Direction Technique recopie cette situation. Un premier réseau local représente le siège. Un second représente la succursale. Aucune route privée n’est ajoutée entre eux. Les postes y portent un agent. Cette copie n’est pas un jeu. Elle oblige la solution à vivre avec la distance, comme SSN la vit chaque jour.
-
-```
-                    Serveur de supervision
-                         (nuage)
-                           |
-                    réseau privé chiffré
-                     /              \
-            Siège Yaoundé      Succursale Maroua
-            (Windows)          (Linux)
-            Téléchargements    Téléchargements
-```
 
 ```
 +-----------------------------------------------------------------------------------+
@@ -251,7 +278,7 @@ L’analyste ouvre le tableau de bord par ce même lien. L’écran d’administ
 
 La machine distante rassemble trois rôles. Elle reçoit les traces. Elle les range. Elle les affiche. Un relais de messagerie complète le dispositif. Le SIEM ne parle pas tout seul à Internet pour envoyer un mail. Il dépose le message chez ce relais. Le relais, une fois reconnu, l’achemine vers la boîte de l’équipe.
 
-Le seuil retenu envoie un courriel dès qu’un incident devient sérieux. Une attaque par mot de passe entre dans ce cas. Un fichier jugé malveillant aussi. Un changement dans Téléchargements prévient likewise, afin que l’analyse d’empreinte ne reste pas silencieuse. Les confirmations — poste bloqué, agent coupé — partent elles aussi. L’équipe suit le début et la fin de l’incident.
+Le seuil retenu envoie un courriel dès qu’un incident devient sérieux. Une attaque par mot de passe entre dans ce cas. Un fichier jugé malveillant aussi. Un changement dans Téléchargements prévient aussi, afin que l’analyse d’empreinte ne reste pas silencieuse. Les confirmations — poste bloqué, agent coupé — partent elles aussi. L’équipe suit le début et la fin de l’incident.
 
 ---
 
@@ -327,7 +354,7 @@ Le délai avant détection se compte en secondes, le temps que la rafale soit re
 
 ### 3.2.3. Second essai : un fichier modifié ou un logiciel dangereux
 
-Le chapitre 2 décrivait un second scénario. Un fichier malveillant arrive, souvent par téléchargement. Il change des dossiers. Rien ne le voit. Il s’exécute. Parfois, il efface les traces. Nous éprouvons ici deux gestes. L’un touche un programme système. L’autre dépose un fichier dans Téléchargements.
+Le chapitre 2 décrivait un second scénario. Un fichier malveillant arrive, souvent par téléchargement. Il change des dossiers. Rien ne le voit. Il s’exécute. Parfois, il efface les traces. Nous éprouvons ici deux gestes. L’un touche un programme système. L’autre dépose un fichier dans Téléchargements. Le déroulement suit le diagramme de séquence de la figure 3.0c.
 
 #### 3.2.3.1. Conduite de l’essai
 
@@ -337,11 +364,11 @@ Nous déposons ensuite un fichier dans Téléchargements, à Yaoundé puis à Ma
 
 #### 3.2.3.2. Ce que l’équipe apprend par courriel
 
-Le message décrit le chemin du fichier, l’ancienne et la nouvelle empreinte, la machine concernée. Il part pendant que le poste agit, selon la même logique parallèle que le diagramme de séquence. L’analyste n’ouvre pas l’écran pour apprendre qu’un téléchargement vient d’être jugé dangereux, ou qu’un programme système a changé. Un dernier courriel dit si la suppression a réussi ou échoué.
+Le message décrit le chemin du fichier, l’ancienne et la nouvelle empreinte, la machine concernée. Il part pendant que le poste agit, comme la flèche droite du diagramme de séquence (figure 3.0c). L’analyste n’ouvre pas l’écran pour apprendre qu’un téléchargement vient d’être jugé dangereux, ou qu’un programme système a changé. Un dernier courriel dit si la suppression a réussi ou échoué.
 
 #### 3.2.3.3. Deux réponses, selon la gravité
 
-Si le fichier de Téléchargements est reconnu dangereux, l’agent l’efface. Sous Windows, le même principe s’applique. Le ticket de dépannage n’est plus le premier geste.
+Si le fichier de Téléchargements est reconnu dangereux, l’agent l’efface. C’est la flèche gauche du même diagramme. Sous Windows, le même principe s’applique. Le ticket de dépannage n’est plus le premier geste.
 
 Si c’est un programme d’ouverture de session qui a changé, ôter un fichier ne suffit plus. Le poste peut servir de tremplin. Nous demandons alors un isolement. Le poste cesse de parler à ses voisins. Il garde le lien privé d’administration. L’analyste l’interroge encore. Il ne se propage plus. C’est l’isolement qui manquait au chapitre 2.
 
@@ -400,6 +427,6 @@ Des limites demeurent. Un seul serveur rassemble aujourd’hui tous les rôles. 
 
 Nous avons proposé une solution adaptée au problème de SSN. Le cerveau de la supervision habite le nuage. Les agents restent sur les postes de Yaoundé et de Maroua. Un réseau privé fournit le lien qui manquait. Les postes se défendent seuls. L’équipe est prévenue par courriel.
 
-La section 1 a fixé les besoins et les schémas, dont le diagramme de séquence qui ordonne détection, blocage et message. La section 2 a montré que la plateforme s’installe de façon répétée, qu’une attaque par mot de passe à Maroua est stoppée, et qu’un fichier dangereux à Yaoundé est vu, signalé, puis traité.
+La section 1 a fixé les besoins et les schémas, dont les deux diagrammes de séquence : force brute d’un côté, fichier dangereux de l’autre. La section 2 a montré que la plateforme s’installe de façon répétée, qu’une attaque par mot de passe à Maroua est stoppée, et qu’un fichier dangereux à Yaoundé est vu, signalé, puis traité.
 
 Le MTTD ne se compte plus en semaines. Le MTTR ne dépend plus d’un ticket. La conclusion générale reviendra sur le bilan du stage et sur les pistes d’amélioration. Pour les fichiers de configuration, on se référera à l’annexe A.
