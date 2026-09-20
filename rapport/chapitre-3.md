@@ -5,8 +5,11 @@ Note Word — Guide ISJ 2025 (retirer avant impression) :
 - Titre et source SOUS chaque figure. Tableau d’auteur : pas de source.
 - Volume du chapitre 3 (Ingé 4) : 12 pages. Ne pas aérer ni condenser au-delà.
 - Coller dans rapport-de-stage.docx à la place du titre vide du chapitre 3.
-- Tableaux III.1 et III.2. Figures 3.1 à 3.7, plus 3.0a à 3.0d (UML).
-- Réserver les cadres « COURRIEL » pour les captures de la boîte mail (hauteur ~8 cm).
+- Tableaux III.1 et III.2. Figures 3.1 à 3.11, plus 3.0a à 3.0d (UML).
+- Quatre cadres COURRIEL (fig. 3.4, 3.5, 3.7, 3.8) : captures de la boîte mail, ~8 cm.
+- Cinq cadres INTERFACE WAZUH DASHBOARD (fig. 3.3, 3.6, 3.9, 3.10, 3.11) :
+  captures de l’écran Wazuh, ~8 cm, centrées.
+  Si le chapitre dépasse 12 pages, placer 3.5, 3.8 et 3.10 en annexe B.
 - Exporter les PlantUML en PNG. Détail de configuration : annexe A.
 - Abréviation à ajouter en page liminaire : VirusTotal (VT).
 -->
@@ -278,7 +281,7 @@ Le vrai apport réseau n’est pas un nouveau pare-feu de site. C’est le lien 
 
 Deux conséquences suivent. Premièrement, le serveur d’alertes n’écoute pas sur Internet. Un inconnu ne s’y enregistre pas comme s’il était un poste de SSN. Deuxièmement, une panne électrique au siège n’éteint plus la vue sur Maroua. Le cerveau habite le cloud. Le chapitre 2 avait nommé ce risque. La solution le traite.
 
-L’analyste ouvre le tableau de bord par ce même lien. L’écran d’administration n’est pas public.
+L’analyste ouvre le tableau de bord Wazuh par ce même lien. L’écran d’administration n’est pas public. Les captures de cette interface figurent en section 2 (figures 3.3, 3.6, 3.9, 3.10 et 3.11).
 
 #### 3.1.3.3. Le serveur de supervision et le courriel
 
@@ -316,7 +319,11 @@ Reste le raccordement des postes. Il se fait au laboratoire, sur les copies de Y
 
 ```
 +-----------------------------------------------------------------------------------+
-|             [ ZONE D'INSERTION : DÉROULEMENT DE L'INSTALLATION AUTOMATISÉE ]      |
+|                                                                                   |
+|     [ ZONE D'INSERTION : CAPTURE GITHUB ACTIONS — INSTALLATION ]                  |
+|     Coller ici la capture du pipeline (jobs test, terraform, ansible).            |
+|     Hauteur conseillée : 8 cm. Centrer l'image.                                   |
+|                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
@@ -324,6 +331,21 @@ Reste le raccordement des postes. Il se fait au laboratoire, sur les copies de Y
 **Source :** Dépôt du projet de stage (2026)
 
 La première installation dure plus longtemps. C’est normal : le SIEM s’installe en entier. Les fois suivantes vont plus vite. On ne refait que les réglages.
+
+L’interface Wazuh Dashboard confirme ensuite le raccordement. Les deux agents, Yaoundé et Maroua, y apparaissent comme actifs, chacun dans son groupe.
+
+```
++-----------------------------------------------------------------------------------+
+|                                                                                   |
+|     [ ZONE D'INSERTION : INTERFACE WAZUH DASHBOARD — LISTE DES AGENTS ]           |
+|     Coller ici la capture Wazuh (Agents) : SITE-1 et SITE-2 au statut Active.     |
+|     Hauteur conseillée : 8 cm. Centrer l'image.                                   |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+```
+
+**Figure 3.3 :** Interface Wazuh Dashboard : agents du siège et de la succursale  
+**Source :** Interface Wazuh Dashboard (2026)
 
 ---
 
@@ -349,7 +371,7 @@ Un échec isolé n’alarme personne. Une série, si. Le moteur reconnaît la ra
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.3 :** Courriel d’alerte reçu par l’équipe lors de l’attaque par mot de passe  
+**Figure 3.4 :** Courriel d’alerte reçu par l’équipe lors de l’attaque par mot de passe  
 **Source :** Boîte de messagerie de l’équipe de supervision (2026)
 
 ```
@@ -362,27 +384,27 @@ Un échec isolé n’alarme personne. Une série, si. Le moteur reconnaît la ra
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.4 :** Courriel de confirmation du blocage automatique  
+**Figure 3.5 :** Courriel de confirmation du blocage automatique  
 **Source :** Boîte de messagerie de l’équipe de supervision (2026)
 
 #### 3.2.2.3. Ce que le poste fait tout seul
 
 Dès que la rafale est reconnue, le serveur donne un ordre au poste visé. C’est la flèche gauche du même diagramme. Le poste bloque l’adresse pendant une heure. Les essais suivants n’obtiennent plus de réponse. Sous Windows, le pare-feu du poste joue le même rôle.
 
-Nous vérifions le résultat de quatre manières. L’écran montre l’alerte et la confirmation. Le journal de l’agent consigne l’action. La liste de filtrage contient l’adresse bloquée. La boîte mail contient les deux messages. L’outil d’attaque cesse d’avancer.
+Nous vérifions le résultat de quatre manières. L’interface Wazuh Dashboard montre l’alerte et la confirmation. Le journal de l’agent consigne l’action. La liste de filtrage contient l’adresse bloquée. La boîte mail contient les deux messages. L’outil d’attaque cesse d’avancer.
 
 ```
 +-----------------------------------------------------------------------------------+
 |                                                                                   |
-|        [ ZONE D'INSERTION : TABLEAU DE BORD — FORCE BRUTE ET BLOCAGE ]            |
-|        Coller ici la capture de la console (alerte et confirmation).              |
-|        Hauteur conseillée : 8 cm. Centrer l'image.                                |
+|     [ ZONE D'INSERTION : INTERFACE WAZUH DASHBOARD — FORCE BRUTE ]                |
+|     Coller ici la capture Wazuh (Security events) : alerte de rafale et           |
+|     confirmation du blocage. Hauteur conseillée : 8 cm. Centrer l'image.          |
 |                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.5 :** Détection d’une attaque par mot de passe et blocage automatique  
-**Source :** Console de supervision (2026)
+**Figure 3.6 :** Interface Wazuh Dashboard : détection de l’attaque par mot de passe et blocage  
+**Source :** Interface Wazuh Dashboard (2026)
 
 Le délai avant détection se compte en secondes, le temps que la rafale soit reconnue. Le délai avant blocage reste inférieur à une minute. Ces temps ne dépendent plus d’un technicien présent.
 
@@ -412,7 +434,7 @@ Le message décrit le chemin du fichier, l’ancienne et la nouvelle empreinte, 
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.6 :** Courriel d’alerte reçu après le verdict VirusTotal  
+**Figure 3.7 :** Courriel d’alerte reçu après le verdict VirusTotal  
 **Source :** Boîte de messagerie de l’équipe de supervision (2026)
 
 ```
@@ -425,7 +447,7 @@ Le message décrit le chemin du fichier, l’ancienne et la nouvelle empreinte, 
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.7 :** Courriel de compte rendu de la suppression du fichier  
+**Figure 3.8 :** Courriel de compte rendu de la suppression du fichier  
 **Source :** Boîte de messagerie de l’équipe de supervision (2026)
 
 #### 3.2.3.3. Deux réponses, selon la gravité
@@ -434,36 +456,52 @@ Si le fichier de Téléchargements est reconnu dangereux par VirusTotal, l’age
 
 Si c’est un programme d’ouverture de session qui a changé, ôter un fichier ne suffit plus. Le poste peut servir de tremplin. Nous demandons alors un isolement. Le poste cesse de parler à ses voisins. Il garde le lien privé d’administration. L’analyste l’interroge encore. Il ne se propage plus. C’est l’isolement qui manquait au chapitre 2.
 
+L’interface Wazuh Dashboard montre le changement de fichier, le verdict VirusTotal, puis l’effet de la réponse : fichier ôté, ou poste isolé.
+
 ```
 +-----------------------------------------------------------------------------------+
 |                                                                                   |
-|        [ ZONE D'INSERTION : TABLEAU DE BORD — INTÉGRITÉ ET ISOLEMENT ]            |
-|        Coller ici la capture de la console (FIM, VirusTotal, isolement).          |
-|        Hauteur conseillée : 8 cm. Centrer l'image.                                |
+|     [ ZONE D'INSERTION : INTERFACE WAZUH DASHBOARD — FIM ET VIRUSTOTAL ]          |
+|     Coller ici la capture Wazuh (Integrity monitoring / alerte VirusTotal) :      |
+|     chemin du fichier, empreinte, verdict. Hauteur conseillée : 8 cm.             |
 |                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.8 :** Alerte d’intégrité et mise à l’écart du poste compromis  
-**Source :** Console de supervision (2026)
+**Figure 3.9 :** Interface Wazuh Dashboard : contrôle d’intégrité et verdict VirusTotal  
+**Source :** Interface Wazuh Dashboard (2026)
+
+```
++-----------------------------------------------------------------------------------+
+|                                                                                   |
+|     [ ZONE D'INSERTION : INTERFACE WAZUH DASHBOARD — RÉPONSE ET ISOLEMENT ]       |
+|     Coller ici la capture Wazuh (Active response) : suppression ou isolement.     |
+|     Hauteur conseillée : 8 cm. Centrer l'image.                                   |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+```
+
+**Figure 3.10 :** Interface Wazuh Dashboard : suppression du fichier ou isolement du poste  
+**Source :** Interface Wazuh Dashboard (2026)
 
 ---
 
 ### 3.2.4. Ce que change la solution pour SSN
 
-Les deux sites apparaissent désormais dans un seul écran. Les attaques du diagnostic reçoivent une réponse. L’équipe est prévenue sans attendre un appel.
+Les deux sites apparaissent désormais dans un seul écran de l’interface Wazuh Dashboard. Les attaques du diagnostic reçoivent une réponse. L’équipe est prévenue sans attendre un appel.
 
 ```
 +-----------------------------------------------------------------------------------+
 |                                                                                   |
-|        [ ZONE D'INSERTION : VUE D'ENSEMBLE DU TABLEAU DE BORD ]                   |
-|        Coller ici la vue générale des deux sites. Hauteur conseillée : 8 cm.      |
+|     [ ZONE D'INSERTION : INTERFACE WAZUH DASHBOARD — VUE D'ENSEMBLE ]             |
+|     Coller ici l’écran d’accueil Wazuh (agents, alertes, deux sites).             |
+|     Hauteur conseillée : 8 cm. Centrer l'image.                                   |
 |                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.9 :** Vue d’ensemble de la supervision des deux sites  
-**Source :** Console de supervision (2026)
+**Figure 3.11 :** Interface Wazuh Dashboard : vue d’ensemble de la supervision des deux sites  
+**Source :** Interface Wazuh Dashboard (2026)
 
 Le tableau III.2 place côte à côte le constat du chapitre 2 et le résultat du chapitre 3.
 
