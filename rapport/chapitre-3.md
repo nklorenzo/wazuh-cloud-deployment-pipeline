@@ -3,114 +3,110 @@ Note Word — Guide ISJ 2025 (retirer avant impression) :
 - Times New Roman 12, justifié, interligne 1,15, retrait 1 cm, marges 2,5 cm.
 - Pagination bas à droite. Texte noir. Recto uniquement.
 - Titre et source SOUS chaque figure. Tableau d’auteur : pas de source.
-- Volume du chapitre 3 (Ingé 4) : 12 pages. Ne pas aérer ni condenser au-delà.
+- Volume du chapitre 3 (Ingé 4) : 12 pages.
 - Coller dans rapport-de-stage.docx à la place du titre vide du chapitre 3.
 - Tableaux III.1 et III.2. Figures 3.1 à 3.11, plus 3.0a à 3.0d (UML).
-- Quatre cadres COURRIEL (fig. 3.4, 3.5, 3.7, 3.8) : captures de la boîte mail, ~8 cm.
-- Cinq cadres INTERFACE WAZUH DASHBOARD (fig. 3.3, 3.6, 3.9, 3.10, 3.11) :
-  captures de l’écran Wazuh, ~8 cm, centrées.
-  Si le chapitre dépasse 12 pages, placer 3.5, 3.8 et 3.10 en annexe B.
-- Exporter les PlantUML en PNG. Détail de configuration : annexe A.
-- Abréviation à ajouter en page liminaire : VirusTotal (VT).
+- Quatre cadres COURRIEL (fig. 3.4, 3.5, 3.7, 3.8) et cinq cadres INTERFACE
+  WAZUH DASHBOARD (fig. 3.3, 3.6, 3.9, 3.10, 3.11), hauteur ~7 cm, centrés.
+- Arbitrage des 12 pages, dans cet ordre : réduire les captures à 6 cm, puis
+  déplacer les figures 3.5, 3.8 et 3.10 en annexe B (les renvois sont déjà rédigés).
+- Exporter les PlantUML en PNG. Fichiers de configuration : annexe A.
+- Abréviations à ajouter en page liminaire : VT (VirusTotal), IaC, CI/CD.
 -->
 
 # Chapitre 3 : Solution Proposée
 
 ## Introduction du chapitre
 
-Le chapitre 2 dresse un diagnostic net. System Security Network (SSN) protège mal ses postes de travail. Ces postes occupent le siège de Yaoundé et la succursale de Maroua. Aucun lien privé ne relie les deux villes. Chaque machine garde ses journaux chez elle. L’équipe n’agit que lorsqu’un utilisateur signale un blocage. Une intrusion reste donc invisible plusieurs semaines.
+Le chapitre 2 a établi un diagnostic sans ambiguïté. Les postes de travail de System Security Network (SSN), répartis entre le siège de Yaoundé et la succursale de Maroua, constituent aujourd’hui la surface d’attaque la plus exposée de l’entreprise. Aucune liaison privée ne relie les deux implantations, chaque machine conserve ses journaux sur son propre disque, et l’équipe technique n’intervient qu’à la demande de l’utilisateur. Une intrusion discrète peut donc demeurer active plusieurs semaines.
 
-La même étude fixe déjà une orientation. Le cerveau de la supervision quitte le siège. Il migre dans le cloud. De petits programmes, les agents, demeurent sur les postes. Un réseau privé relie l’ensemble. Le présent chapitre convertit cette orientation en solution. Notre apport pour l’entreprise se situe ici.
+Ce même diagnostic a dégagé une orientation. Le serveur central de supervision doit quitter les équipements locaux du siège pour rejoindre le cloud, tandis que des agents légers demeurent installés sur les postes. Une liaison privée chiffrée relie ensuite ces deux mondes. Le présent chapitre transforme cette orientation en dispositif opérationnel, éprouvé sur un banc d’essai. C’est à ce niveau que se situe notre apport pour l’entreprise.
 
-Précisons le vocabulaire avant d’avancer. Un *Security Information and Event Management* (SIEM) rassemble les traces, les compare, puis lève une alerte. Un agent, logiciel léger, habite le poste et envoie ces traces. Une réponse active exécute, sur la machine visée, un geste automatique : bloquer une adresse, ôter un fichier, isoler l’hôte. Le *File Integrity Monitoring* (FIM) surveille les changements de fichiers. VirusTotal est un service d’analyse : il compare l’empreinte d’un fichier à de nombreux moteurs antivirus et dit s’il est dangereux. Le *Mean Time To Detect* (MTTD) mesure, en secondes ou en semaines, le délai moyen avant découverte. Le *Mean Time To Respond* (MTTR) mesure le délai moyen avant correction.
+Quelques notions méritent d’être posées avant d’entrer dans la conception. Un *Security Information and Event Management* (SIEM) centralise les journaux de sécurité, les corrèle et produit des alertes hiérarchisées. Un agent désigne le logiciel installé sur le poste surveillé : il collecte les traces et exécute les ordres reçus. Une réponse active (*Active Response*) est l’action automatique déclenchée sur la machine visée, qu’il s’agisse de bloquer une adresse, de supprimer un fichier ou d’isoler l’hôte. Le contrôle d’intégrité des fichiers (*File Integrity Monitoring*, FIM) signale toute modification d’un fichier surveillé. VirusTotal, enfin, est un service d’analyse en ligne qui confronte l’empreinte d’un fichier à plusieurs dizaines de moteurs antivirus et retourne un verdict consolidé.
 
-Nous retenons Wazuh comme SIEM. Owolafe et James (2024), déjà cités au tableau II, fondent ce choix : la plateforme surveille les postes, contrôle l’intégrité et répond toute seule, sans pile trop lourde.
+Nous retenons Wazuh comme SIEM, conformément à l’étude d’Owolafe et James (2024) présentée au tableau II. Cette plateforme réunit dans un même produit la surveillance des postes, le contrôle d’intégrité et la réponse active, pour une consommation de ressources maîtrisée. La conception précède l’installation : nous employons le langage *Unified Modeling Language* (UML), qui décrit les acteurs, la chronologie des échanges et la répartition des composants sans imposer la lecture du code.
 
-La modélisation précède le déploiement. *Unified Modeling Language* (UML) montre qui agit, dans quel ordre, et sur quelle machine. Le lecteur n’a pas besoin du code pour suivre.
-
-Deux sections composent le chapitre, selon le Guide de l’Institut Saint Jean (ISJ). La section 1 fixe les besoins, les schémas et l’architecture. La section 2 décrit l’installation, puis deux essais calés sur le diagnostic : une attaque par mot de passe à Maroua, un fichier altéré à Yaoundé. Dans les deux cas, la machine réagit. Un courriel prévient l’équipe en même temps.
+Deux sections structurent ce chapitre, selon le canevas du Guide de l’Institut Saint Jean (ISJ). La première analyse les besoins, les modélise et présente l’architecture retenue. La seconde décrit le déploiement automatisé, puis deux expérimentations directement issues du diagnostic : une attaque par force brute contre un poste de Maroua, puis l’altération d’un fichier au siège. Dans les deux cas, la machine visée réagit d’elle-même pendant qu’un courriel alerte l’équipe.
 
 ---
 
 ## Section 1 : Analyse, modélisation et architecture de la solution
 
-Cette section construit d’abord la solution sur le papier. Elle part des besoins de SSN. Elle les dessine. Elle nomme ensuite le rôle de chaque composant.
+Cette première section construit la solution avant toute installation. Elle part des besoins de SSN, les traduit en modèles UML, puis décrit l’architecture réseau et le rôle de chaque composant.
 
-### 3.1.1. Démarche retenue et cahier des charges
+### 3.1.1. Démarche d’ingénierie et cahier des charges
 
-#### 3.1.1.1. Une sécurité pensée dès la conception
+#### 3.1.1.1. Une sécurité intégrée au cycle de vie du projet
 
-Nous n’ajoutons pas la sécurité à la fin. Nous la plaçons dans chaque étape. Cinq temps s’enchaînent.
+La démarche retenue relève du DevSecOps, c’est-à-dire de l’intégration de la sécurité à chaque étape du cycle de vie, plutôt que de son ajout en fin de parcours. Cinq phases s’enchaînent et se répondent.
 
-D’abord, nous planifions. Le parc de la Direction Technique mélange Windows, Linux et, parfois, macOS. Les deux villes n’ont pas de tunnel dédié. Il faut donc un serveur central joignable des deux côtés, et des agents discrets sur les postes.
+La planification part du terrain. Le parc de la Direction Technique associe des postes Windows, Linux et, plus rarement, macOS, répartis sur deux sites dépourvus de tunnel dédié. Cette hétérogénéité impose un serveur central joignable depuis les deux villes, ainsi que des agents assez discrets pour ne pas pénaliser des machines de bureau.
 
-Ensuite, nous décrivons l’infrastructure par écrit. L’ordinateur distant, ses règles d’accès et sa clé tiennent dans un fichier unique. Rien d’essentiel ne se clique à la main. On recrée l’ensemble. On l’efface aussi, proprement, quand il le faut.
+L’infrastructure est ensuite décrite sous forme de code (*Infrastructure as Code*, IaC). Terraform déclare, dans un fichier versionné, la machine virtuelle de supervision, son disque, ses règles de filtrage et sa clé d’accès. Aucune ressource essentielle n’est créée manuellement, ce qui garantit une reconstruction identique et une suppression propre.
 
-Puis l’enchaînement automatique prend le relais. Chaque mise à jour validée déclenche trois gestes : vérifier les fichiers, créer la machine, installer le SIEM. L’opérateur n’apprend plus une litanie de commandes.
+L’intégration et le déploiement continus (*Continuous Integration / Continuous Deployment*, CI/CD) prennent alors le relais. À chaque modification validée du dépôt, GitHub Actions vérifie la cohérence des fichiers, provisionne la machine, puis lance Ansible qui installe et configure Wazuh. La procédure ne varie donc pas d’une exécution à l’autre.
 
-La détection vient alors. Le SIEM n’affiche pas seulement des courbes. Il donne un ordre à l’agent : bloquer l’attaquant, enlever un fichier dangereux, couper le poste du réseau local tout en gardant un accès d’administration.
+Vient la détection. Wazuh ne se contente pas d’afficher des tableaux de bord : il transmet un ordre à l’agent concerné, qu’il s’agisse de bloquer l’adresse d’un attaquant, de supprimer un fichier malveillant ou d’isoler le poste tout en préservant l’accès d’administration.
 
-Enfin, un courriel part. Le chapitre 2 a montré que personne ne lit les journaux en continu. Le message réveille l’humain. Il n’a pas vocation à remplacer l’action automatique. Il l’accompagne.
-
-Cette boucle — prévoir, installer, détecter, agir, prévenir — fait de la sécurité une propriété du système. Elle n’est plus un contrôle extérieur, trop tardif.
+La notification clôt la boucle. Le chapitre 2 a montré que personne, chez SSN, ne consulte les journaux en continu. Un courriel informe donc l’équipe au moment même où la réponse active s’exécute. Il ne remplace pas l’action automatique ; il la rend visible.
 
 #### 3.1.1.2. Besoins fonctionnels
 
-Nous traduisons le diagnostic du chapitre 2 en cinq capacités. Chacune se constate sur la plateforme.
+Nous traduisons le diagnostic en cinq besoins fonctionnels, chacun correspondant à une capacité observable sur la plateforme déployée.
 
-**BF-01 — Rassembler les traces.** Chaque poste envoie ses journaux vers le serveur central. Connexions distantes, changements de fichiers, gestes de défense : tout quitte la machine dès l’événement. Si un logiciel malveillant efface ensuite les fichiers locaux, la copie centrale existe déjà. Voilà la réponse au cloisonnement décrit plus tôt.
+**BF-01 — Centraliser les journaux.** Chaque poste doit transmettre au serveur central ses traces d’authentification, ses événements d’intégrité et ses comptes rendus de réponse active. Les données quittent la machine dès l’événement, de sorte qu’un logiciel malveillant effaçant ensuite les journaux locaux ne supprime plus la copie déjà exportée. Ce besoin répond directement au cloisonnement décrit au chapitre 2.
 
-**BF-02 — Comprendre tout de suite.** Un échec isolé de mot de passe n’est pas une attaque. Une rafale l’est. Un fichier ajouté dans Téléchargements n’est pas forcément un virus. Le moteur relie ces faits. Il lève une alerte utile, pas un bruit.
+**BF-02 — Corréler en temps réel.** Un échec d’authentification isolé ne constitue pas une attaque, alors qu’une rafale d’échecs en provenance de la même adresse en constitue une. De même, un fichier déposé dans le dossier Téléchargements n’est pas nécessairement malveillant. Le moteur de corrélation doit donc relier ces événements et ne produire une alerte que lorsque le motif devient significatif.
 
-**BF-03 — Agir sans ticket.** Le chapitre 2 a établi l’absence de procédure d’incident. La machine visée bloque elle-même l’adresse attaquante, ôte un fichier reconnu dangereux, ou se coupe du réseau local. L’attente d’un technicien n’est plus le premier rempart.
+**BF-03 — Répondre sans intervention humaine.** En l’absence de procédure formalisée de réponse aux incidents, la machine visée doit agir seule : bloquer l’adresse de l’attaquant, supprimer le fichier reconnu dangereux, ou se retirer du réseau local. L’intervention du technicien cesse d’être le premier rempart pour devenir une étape d’investigation.
 
-**BF-04 — Voir les deux sites sur un seul écran.** L’analyste n’ouvre plus une session à Yaoundé et une autre à Maroua. Un tableau unique présente les alertes, l’état des agents et le suivi des actions.
+**BF-04 — Unifier la visualisation.** L’analyste ne doit plus ouvrir une session distincte pour Yaoundé et pour Maroua. Une console unique doit présenter les alertes des deux sites, l’état des agents et le suivi des réponses actives.
 
-**BF-05 — Prévenir par courriel.** L’équipe n’intervient aujourd’hui qu’à la demande de l’utilisateur. Toute alerte grave produit donc un message. Ce message part en même temps que l’action. Ni l’un ni l’autre n’attend.
+**BF-05 — Notifier par courriel.** Toute alerte de gravité élevée doit produire un message électronique à destination de l’équipe. Ce courriel part simultanément à la réponse active : le confinement ne retarde pas la notification, et la notification ne retarde pas le confinement.
 
 #### 3.1.1.3. Besoins non fonctionnels
 
-Quatre qualités encadrent le tout.
+Quatre exigences de qualité encadrent la solution.
 
-Le lien entre les postes et le serveur se chiffre. Il ne traverse pas Internet en clair. Un réseau privé maillé joue ce rôle.
+Le trafic échangé entre les agents et le serveur central doit être chiffré de bout en bout, sans transiter en clair par Internet. Un réseau privé maillé assure cette protection.
 
-L’agent reste léger. Les postes du laboratoire n’égalent pas un grand serveur. On surveille les dossiers utiles, non la machine entière par des modules lourds.
+L’agent doit rester léger, car il s’exécute sur des postes de bureau aux ressources limitées. Nous restreignons donc la surveillance temps réel aux répertoires réellement exposés, sans activer les modules d’audit les plus coûteux.
 
-Le serveur central survit à une panne du siège. Une coupure à Yaoundé n’aveugle plus Maroua. D’où le cloud pour le cerveau, et les postes pour les agents.
+Le serveur central doit survivre à une défaillance du siège. Une coupure électrique à Yaoundé ne doit plus priver l’entreprise de toute visibilité sur Maroua, ce qui justifie son hébergement dans le cloud.
 
-Le déploiement, enfin, se reproduit. Mots de passe et clés n’entrent pas dans le dossier partagé. Ils restent dans un coffre.
+Le déploiement, enfin, doit être reproductible et exempt de secrets en clair. Les identifiants, clés et jetons d’authentification résident exclusivement dans le coffre de secrets du service d’intégration continue, jamais dans le dépôt de code.
 
-Le tableau III.1 relie chaque besoin à sa réponse. Ce n’est pas un catalogue d’outils. C’est la traduction, en capacités, du diagnostic. Un besoin laissé vide ne ferait que déplacer le problème des postes isolés.
+Le tableau III.1 récapitule cette traçabilité. Il ne s’agit pas d’un catalogue d’outils, mais de la traduction du diagnostic en capacités vérifiables : tout besoin laissé sans réponse déplacerait le problème sans le résoudre.
 
 ```
-+--------+----------------------------------+-------------------------------------------+
-| Code   | Ce que SSN doit obtenir          | Comment la solution y répond              |
-+--------+----------------------------------+-------------------------------------------+
-| BF-01  | Traces centralisées              | Agents locaux, serveur dans le cloud      |
-| BF-02  | Alerte dès que le motif est clair| Corrélation, puis VirusTotal si fichier      |
-| BF-03  | Action sans attendre l’humain    | Blocage, suppression, isolement           |
-| BF-04  | Vue unique des deux sites        | Tableau de bord unique                    |
-| BF-05  | Réveil de l’équipe               | Courriel automatique                      |
-| BNF-01 | Lien privé et chiffré            | Réseau maillé privé                       |
-| BNF-02 | Agent discret                    | Surveillance ciblée des dossiers           |
-| BNF-03 | Indépendance vis-à-vis du siège  | Serveur central dans le cloud             |
-| BNF-04 | Reproductibilité, secrets protégés| Installation automatique, coffre         |
-+--------+----------------------------------+-------------------------------------------+
++--------+-------------------------------------+------------------------------------------+
+| Code   | Capacité attendue                   | Mécanisme retenu                         |
++--------+-------------------------------------+------------------------------------------+
+| BF-01  | Journaux centralisés                | Agents locaux, serveur Wazuh dans le cloud|
+| BF-02  | Corrélation en temps réel           | Moteur de règles, puis analyse VirusTotal |
+| BF-03  | Réponse sans intervention humaine   | Blocage, suppression, isolement de l'hôte |
+| BF-04  | Visualisation unifiée des deux sites| Console Wazuh Dashboard                   |
+| BF-05  | Notification de l'équipe            | Relais de messagerie et courriel          |
+| BNF-01 | Trafic chiffré entre sites          | Réseau privé maillé Tailscale (WireGuard) |
+| BNF-02 | Agent léger sur les postes          | Surveillance ciblée des répertoires       |
+| BNF-03 | Indépendance vis-à-vis du siège     | Hébergement du serveur dans le cloud      |
+| BNF-04 | Reproductibilité, secrets protégés  | Terraform, Ansible, coffre de secrets     |
++--------+-------------------------------------+------------------------------------------+
 ```
 
-**Tableau III.1 :** Correspondance entre les besoins de SSN et la solution proposée
+**Tableau III.1 :** Traçabilité des besoins de SSN vers les mécanismes de la solution
 
 ---
 
 ### 3.1.2. Démarche de modélisation et langage UML
 
-Le Guide ISJ demande d’indiquer la méthode et le langage. Notre démarche descend. Nous partons des personnes et de leurs actes. Nous ordonnons ensuite les messages. Nous plaçons enfin chaque pièce sur une machine.
+Le Guide ISJ demande d’expliciter la méthode et le langage de modélisation. Notre démarche procède par raffinements successifs : nous identifions d’abord les acteurs et leurs actions, nous ordonnons ensuite les échanges dans le temps, puis nous situons chaque composant sur une machine physique ou virtuelle.
 
-UML fournit le dessin. Quatre vues suffisent. La première répond à « qui fait quoi ? ». Les deux suivantes, des diagrammes de séquence, répondent à « dans quel ordre ? » : l’une pour la force brute, l’autre pour le fichier dangereux. La dernière répond à « où cela s’exécute-t-il ? ».
+Le langage retenu est UML, dont la notation normalisée permet au jury comme à l’entreprise de lire l’architecture sans parcourir les fichiers de configuration. Quatre vues suffisent à couvrir la solution : un diagramme de cas d’utilisation, deux diagrammes de séquence — l’un pour la force brute, l’autre pour le fichier malveillant — et un diagramme de déploiement.
 
 #### 3.1.2.1. Diagramme de cas d’utilisation
 
-Quatre acteurs apparaissent. L’administrateur installe la plateforme. L’analyste lit le tableau de bord et les courriels. L’agent local collecte les traces et exécute les ordres. L’attaquant fournit les stimuli : mot de passe forcé ou fichier dangereux.
+Quatre acteurs interviennent. L’administrateur déploie et maintient la plateforme. L’analyste consulte la console et reçoit les alertes. L’agent local collecte les traces et applique les ordres de défense. L’attaquant, enfin, produit les stimuli que sont la force brute et le dépôt d’un fichier malveillant.
 
 ```plantuml
 @startuml
@@ -121,14 +117,14 @@ actor "Agent local" as Agent
 actor "Attaquant" as Attaquant
 
 rectangle "Supervision de sécurité SSN" {
-  usecase "Installer la plateforme" as UC1
+  usecase "Déployer la plateforme" as UC1
   usecase "Raccorder un poste" as UC2
   usecase "Consulter les alertes" as UC3
-  usecase "Recevoir un courriel" as UC4
+  usecase "Recevoir une notification" as UC4
   usecase "Détecter une attaque" as UC5
-  usecase "Agir sur le poste visé" as UC6
-  usecase "Forcer un mot de passe" as UC7
-  usecase "Poser un fichier dangereux" as UC8
+  usecase "Exécuter une réponse active" as UC6
+  usecase "Tenter une force brute" as UC7
+  usecase "Déposer un fichier malveillant" as UC8
 }
 
 Admin --> UC1
@@ -139,310 +135,302 @@ Agent --> UC5
 Agent --> UC6
 Attaquant --> UC7
 Attaquant --> UC8
-UC5 ..> UC6
-UC5 ..> UC4
+UC5 ..> UC6 : <<include>>
+UC5 ..> UC4 : <<include>>
 @enduml
 ```
 
-**Figure 3.0a :** Acteurs et cas d’utilisation de la solution  
+**Figure 3.0a :** Acteurs et cas d’utilisation de la plateforme de supervision  
 **Source :** Nos travaux, modélisation UML (2026)
 
-Le point décisif tient au double départ. Dès la détection, une action part vers le poste. Un courriel part vers l’analyste. L’un n’attend pas l’autre.
+Les deux relations d’inclusion issues de la détection traduisent l’exigence centrale du cahier des charges : une même alerte déclenche simultanément la réponse active et la notification de l’analyste.
 
-#### 3.1.2.2. Diagramme de séquence d’une force brute
+#### 3.1.2.2. Diagramme de séquence : détection d’une attaque par force brute
 
-Ce diagramme occupe une place centrale. Il raconte, dans le temps, ce que le chapitre 2 décrivait comme impossible : voir la rafale, bloquer l’adresse, prévenir l’équipe, et le faire **ensemble**. L’attaquant frappe un poste de Maroua. L’agent envoie les échecs. Le serveur reconnaît la série. Il ordonne le filtrage. Il dépose, en parallèle, un courriel.
+Ce diagramme décrit, dans l’ordre chronologique, ce que le chapitre 2 présentait comme impossible : reconnaître une rafale de tentatives, bloquer l’adresse fautive et prévenir l’équipe, le tout sans intervention humaine. L’attaquant cible un poste de Maroua, l’agent transmet les échecs, le serveur les corrèle, puis déclenche en parallèle le filtrage et l’alerte.
 
 ```plantuml
 @startuml
 actor "Attaquant" as A
-participant "Poste Maroua\n(agent local)" as P
-participant "Serveur SIEM\n(cloud)" as S
-participant "Messagerie" as M
+participant "Poste Maroua\n(agent Wazuh)" as P
+participant "Serveur Wazuh\n(cloud)" as S
+participant "Relais de messagerie" as M
 actor "Analyste" as An
 
-A -> P : essais répétés de mot de passe
-P -> S : traces d'échec
-S -> S : reconnaissance de la rafale
+A -> P : tentatives répétées d'authentification
+P -> S : traces d'échec (lien chiffré)
+S -> S : corrélation de la rafale
 
 par
-  S -> P : ordre de bloquer l'adresse
-  P -> P : filtrage sur le poste
-  P --> S : confirmation du blocage
+  S -> P : ordre de blocage de l'adresse
+  P -> P : filtrage local pendant une heure
+  P --> S : compte rendu d'exécution
 else
-  S -> M : alerte
+  S -> M : alerte de gravité élevée
   M -> An : courriel
 end
 
-A -> P : nouveaux essais
-P --> A : plus de réponse
-An -> S : consultation du tableau de bord
+A -> P : nouvelles tentatives
+P --> A : absence de réponse
+An -> S : consultation de la console
 @enduml
 ```
 
-**Figure 3.0b :** Diagramme de séquence d’une force brute, avec blocage local et courriel parallèle  
+**Figure 3.0b :** Diagramme de séquence d’une attaque par force brute, avec blocage local et notification parallèle  
 **Source :** Nos travaux, modélisation UML (2026)
 
-Lisons le schéma de haut en bas. L’attaquant envoie des essais. Le poste les enregistre. L’agent les transmet. Le serveur les relie. Deux flèches partent alors du même point. L’une redescend vers le poste : c’est l’ordre de bloquer. L’autre va vers la messagerie : c’est l’alerte. Le fragment parallèle dit l’essentiel. Le courriel n’arrive pas « après coup ». Il voyage pendant que le poste se ferme. Les essais suivants ne reçoivent plus de réponse. L’analyste, s’il ouvre ensuite l’écran, ne fait que confirmer ce que le message lui a déjà dit.
+La lecture verticale du schéma met en évidence le point d’articulation. Jusqu’à la corrélation, le flux reste ascendant : le poste subit, l’agent transmet, le serveur analyse. À partir de l’alerte, deux flux descendent simultanément, ce qu’exprime le fragment parallèle. Le premier ordonne le blocage, le second alimente la messagerie. Le courriel ne constitue donc pas un compte rendu différé : il voyage pendant que le poste se protège. L’analyste qui ouvre ensuite la console ne fait que confirmer une information déjà reçue. L’expérimentation de la section 2 rejoue cette séquence à l’identique.
 
-Cette lecture prépare la section 2. L’essai de Maroua n’invente pas un autre scénario. Il joue, sur le banc, exactement cette séquence.
+#### 3.1.2.3. Diagramme de séquence : détection d’un fichier malveillant
 
-#### 3.1.2.3. Diagramme de séquence d’une détection de logiciel malveillant
-
-Le second diagramme de séquence traite l’autre menace du chapitre 2. Un fichier arrive, souvent par téléchargement. Rien ne le voyait. Il s’exécutait. Parfois, il effaçait les traces.
-
-Le contrôle d’intégrité, à lui seul, dit seulement qu’un fichier a changé. Il ne dit pas si ce fichier est malveillant. C’est le rôle de VirusTotal. VirusTotal est un service public d’analyse. Il compare l’empreinte du fichier à de nombreux moteurs antivirus. Le SIEM lui envoie cette empreinte, non le fichier entier. Si plusieurs moteurs s’accordent, VirusTotal renvoie un verdict dangereux. Alors seulement le serveur ordonne d’ôter le fichier et prévient l’équipe.
+Le second diagramme traite l’autre menace du diagnostic, celle du fichier téléchargé qui modifie le système sans être repéré. Le contrôle d’intégrité constate ici qu’un fichier a changé, mais il ne se prononce pas sur sa dangerosité : cette qualification revient à VirusTotal. Le serveur lui transmet l’empreinte du fichier, non le fichier lui-même, et n’ordonne la suppression qu’après un verdict défavorable.
 
 ```plantuml
 @startuml
 actor "Attaquant" as A
-participant "Poste Yaoundé\n(agent local)" as P
-participant "Serveur SIEM\n(cloud)" as S
-participant "VirusTotal\n(analyse d'empreintes)" as VT
-participant "Messagerie" as M
+participant "Poste Yaoundé\n(agent Wazuh)" as P
+participant "Serveur Wazuh\n(cloud)" as S
+participant "VirusTotal" as VT
+participant "Relais de messagerie" as M
 actor "Analyste" as An
 
-A -> P : fichier déposé dans Téléchargements
-P -> S : trace de changement d'intégrité
+A -> P : dépôt d'un fichier dans Téléchargements
+P -> S : événement d'intégrité (FIM)
 S -> VT : empreinte du fichier
-VT --> S : verdict (plusieurs moteurs)
+VT --> S : verdict consolidé (plusieurs moteurs)
 
 par
-  S -> P : ordre d'ôter le fichier
+  S -> P : ordre de suppression du fichier
   P -> P : suppression locale
   P --> S : succès ou échec
 else
-  S -> M : alerte enrichie
+  S -> M : alerte enrichie du verdict
   M -> An : courriel
 end
 
-An -> S : consultation du tableau de bord
+An -> S : consultation de la console
 @enduml
 ```
 
-**Figure 3.0c :** Diagramme de séquence d’une détection de malware via VirusTotal, avec suppression locale et courriel parallèle  
+**Figure 3.0c :** Diagramme de séquence d’une détection de logiciel malveillant fondée sur VirusTotal  
 **Source :** Nos travaux, modélisation UML (2026)
 
-Lisons encore de haut en bas. L’attaquant dépose un fichier dans Téléchargements. L’agent voit le changement. Il l’envoie au serveur. Le serveur interroge VirusTotal. VirusTotal compare l’empreinte. Il renvoie un verdict. Si le verdict est dangereux, deux flèches partent du même point. L’une redescend vers le poste : c’est l’ordre d’ôter le fichier. L’autre va vers la messagerie : c’est l’alerte, déjà enrichie par VirusTotal. Le fragment parallèle dit, comme pour la force brute, que le courriel voyage pendant que le poste agit. Un dernier message peut dire si la suppression a réussi.
+La structure reprend celle du schéma précédent, avec une étape supplémentaire : l’interrogation de VirusTotal. Cette étape est déterminante, car elle sépare le simple changement de fichier de la menace avérée. Sans elle, tout téléchargement déclencherait la même alerte et la suppression automatique deviendrait inacceptable pour les utilisateurs. Avec elle, l’effacement ne survient qu’après convergence de plusieurs moteurs d’analyse, et le courriel parvient à l’analyste déjà enrichi de ce verdict.
 
-VirusTotal n’installe rien sur le poste. Il n’est pas un antivirus local. Il éclaire la décision du SIEM. Sans lui, tout nouveau fichier dans Téléchargements produirait la même alerte, qu’il soit bénin ou non. Avec lui, la suppression automatique ne part que lorsque plusieurs moteurs confirment le danger.
-
-Lorsque le changement touche un programme d’ouverture de session, ôter un fichier ne suffit plus. Le même schéma s’applique, mais l’ordre redescendu isole le poste du réseau local, tout en gardant le lien privé d’administration. L’essai de Yaoundé, en section 2, joue cette séquence sur le banc.
+Lorsque la modification touche un exécutable système plutôt qu’un simple téléchargement, la suppression du fichier ne suffit plus, car la confiance accordée au poste s’effondre. Le schéma demeure valable, mais l’ordre redescendu isole alors la machine du réseau local, tout en maintenant le canal privé d’administration.
 
 #### 3.1.2.4. Diagramme de déploiement
 
-Le dernier schéma situe les pièces. À gauche, l’installation automatique. Au centre, la machine du cloud, qui porte le SIEM, l’écran et la messagerie. À droite, les deux sites, reproduits en laboratoire, qui portent les agents. Le réseau privé relie le cloud et les postes.
+Le dernier schéma répartit les composants. GitHub Actions déclenche l’installation, la machine hébergée dans le cloud porte Wazuh, la console et le relais de messagerie, tandis que les deux sites reproduits en laboratoire hébergent les agents. Le réseau privé relie ces éléments.
 
 ```plantuml
 @startuml
-node "Installation\nautomatique" as CI
+node "GitHub Actions\n(CI/CD)" as CI
 cloud "Cloud" {
-  node "Serveur de supervision" as SRV
+  node "Serveur Wazuh\n(manager, console, messagerie)" as SRV
 }
-node "Laboratoire (copie de SSN)" {
-  node "Yaoundé\n(siège)" as YDE
-  node "Maroua\n(succursale)" as MRA
+node "Laboratoire — reproduction du parc SSN" {
+  node "Siège\nYaoundé" as YDE
+  node "Succursale\nMaroua" as MRA
 }
-CI --> SRV : installe et configure
+CI --> SRV : provisionne et configure
 YDE ..> SRV : traces chiffrées
 MRA ..> SRV : traces chiffrées
 @enduml
 ```
 
-**Figure 3.0d :** Placement des composants entre le cloud et les deux sites  
+**Figure 3.0d :** Répartition des composants entre le cloud et les deux sites  
 **Source :** Nos travaux, modélisation UML (2026)
 
-Les postes n’exposent pas le SIEM sur Internet. Ils parlent seulement par le lien privé. Le détail des fichiers figure en annexe A.
+Les postes n’exposent aucun service de supervision sur Internet : ils dialoguent uniquement à travers le réseau privé. Les fichiers de configuration correspondants figurent en annexe A.
 
 ---
 
-### 3.1.3. Architecture, lue depuis le terrain
+### 3.1.3. Architecture technique
 
-#### 3.1.3.1. Deux villes, deux réseaux, un laboratoire
+#### 3.1.3.1. Reproduction de la topologie multi-sites
 
-Le chapitre 2 a décrit le parc réel. Yaoundé d’un côté, Maroua de l’autre. Deux réseaux locaux autonomes. Chacun sort vers Internet de son côté. Aucun tunnel d’entreprise ne les relie.
-
-Le laboratoire de la Direction Technique recopie cette situation. Un premier réseau local représente le siège. Un second représente la succursale. Aucune route privée n’est ajoutée entre eux. Les postes y portent un agent. Cette copie n’est pas un jeu. Elle oblige la solution à vivre avec la distance, comme SSN la vit chaque jour.
+Le chapitre 2 a décrit un parc réparti entre deux réseaux locaux autonomes, chacun raccordé séparément à Internet et dépourvu de tunnel d’entreprise. Le laboratoire de la Direction Technique reproduit fidèlement cette configuration : un premier réseau représente le siège, un second la succursale, et aucune route privée ne les relie. Cette reproduction n’a rien d’un exercice théorique, puisqu’elle contraint la solution à fonctionner malgré la distance, la translation d’adresses et les coupures, exactement comme SSN les subit au quotidien.
 
 ```
 +-----------------------------------------------------------------------------------+
-|             [ ZONE D'INSERTION : TOPOLOGIE RÉSEAU MULTI-SITES ]                   |
+|                                                                                   |
+|     [ ZONE D'INSERTION : TOPOLOGIE RÉSEAU MULTI-SITES ]                           |
+|     Coller ici le schéma du laboratoire (siège, succursale, serveur cloud).       |
+|     Hauteur conseillée : 7 cm. Centrer l'image.                                   |
+|                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
 **Figure 3.1 :** Reproduction du siège et de la succursale, reliés au serveur par un réseau privé  
 **Source :** Nos travaux de laboratoire, d’après le diagnostic du chapitre 2 (2026)
 
-Les groupes d’agents suivent la carte de SSN. Le groupe du siège surveille le dossier Téléchargements Windows. Le groupe de la succursale surveille le dossier équivalent sous Linux. C’est souvent par là qu’entre un fichier dangereux, comme le chapitre 2 l’a rappelé. Wazuh sait aussi parler à macOS. Notre banc se limite à Windows et Linux, plus nombreux dans le parc observé.
+Les groupes d’agents épousent l’organisation territoriale de l’entreprise. Le groupe rattaché au siège surveille en temps réel le dossier Téléchargements des postes Windows, celui de la succursale le répertoire équivalent sous Linux. Ce choix n’est pas arbitraire : le chapitre 2 a identifié le téléchargement comme la principale voie d’entrée des fichiers malveillants. Wazuh prend également en charge macOS, mais notre banc d’essai se limite aux deux systèmes majoritaires dans le parc observé.
 
-#### 3.1.3.2. Le lien privé qui manquait
+#### 3.1.3.2. Le réseau privé, chaînon manquant de l’architecture
 
-Le vrai apport réseau n’est pas un nouveau pare-feu de site. C’est le lien qui n’existait pas. Tailscale crée un petit réseau commun. Chaque machine y reçoit une adresse interne. Les journaux y circulent chiffrés. Yaoundé et Maroua restent autonomes pour le travail quotidien. Ils partagent seulement un chemin sûr vers le serveur.
+L’apport réseau déterminant ne réside pas dans un nouveau pare-feu périmétrique, mais dans la liaison qui faisait défaut. Tailscale constitue un réseau privé maillé, fondé sur le protocole WireGuard, au sein duquel chaque machine reçoit une adresse interne. Les journaux y circulent chiffrés de bout en bout. Yaoundé et Maroua conservent leur autonomie pour le trafic quotidien et ne partagent qu’un chemin sécurisé vers le serveur de supervision.
 
-Deux conséquences suivent. Premièrement, le serveur d’alertes n’écoute pas sur Internet. Un inconnu ne s’y enregistre pas comme s’il était un poste de SSN. Deuxièmement, une panne électrique au siège n’éteint plus la vue sur Maroua. Le cerveau habite le cloud. Le chapitre 2 avait nommé ce risque. La solution le traite.
+Deux conséquences en découlent. D’une part, les ports d’ingestion du serveur n’écoutent pas sur Internet, ce qui interdit à un tiers de se déclarer agent de SSN. D’autre part, une coupure au siège ne prive plus l’entreprise de visibilité sur la succursale, puisque le serveur réside dans le cloud : le risque identifié au chapitre 2 se trouve ainsi traité.
 
-L’analyste ouvre le tableau de bord Wazuh par ce même lien. L’écran d’administration n’est pas public. Les captures de cette interface figurent en section 2 (figures 3.3, 3.6, 3.9, 3.10 et 3.11).
+L’analyste accède à la console Wazuh Dashboard par cette même liaison privée, l’interface d’administration n’étant jamais exposée publiquement. Les captures de cette console figurent en section 2 (figures 3.3, 3.6, 3.9, 3.10 et 3.11).
 
-#### 3.1.3.3. Le serveur de supervision et le courriel
+#### 3.1.3.3. Serveur de supervision et chaîne de notification
 
-La machine distante rassemble trois rôles. Elle reçoit les traces. Elle les range. Elle les affiche. Un relais de messagerie complète le dispositif. Le SIEM ne parle pas tout seul à Internet pour envoyer un mail. Il dépose le message chez ce relais. Le relais, une fois reconnu, l’achemine vers la boîte de l’équipe.
+La machine hébergée dans le cloud assume trois fonctions : elle reçoit les événements, les indexe, puis les restitue dans une console unique. Un relais de messagerie complète ce dispositif. Wazuh ne contacte pas directement un serveur de courrier sur Internet ; il dépose ses messages auprès du relais local, qui les achemine ensuite vers la boîte de l’équipe après authentification. Cette séparation des rôles isole le secret de messagerie du moteur de détection.
 
-Le seuil retenu envoie un courriel dès qu’un incident devient sérieux. Une attaque par mot de passe entre dans ce cas. Un fichier jugé malveillant aussi. Un changement dans Téléchargements prévient aussi, une fois VirusTotal consulté, afin que l’analyse d’empreinte ne reste pas silencieuse. Les confirmations — poste bloqué, agent coupé — partent elles aussi. L’équipe suit le début et la fin de l’incident.
-
----
-
-### 3.1.4. Organisation du travail
-
-Le projet tient dans un dépôt unique. Trois dossiers suffisent à le comprendre. Le premier décrit la machine distante. Le deuxième décrit ce que l’on installe dessus. Le troisième décrit l’enchaînement qui, à chaque validation, vérifie, crée, puis configure.
-
-Nous ne reproduisons pas ici les fichiers complets. Ils alourdiraient la lecture. On se référera, pour le détail, à l’annexe A. L’idée à retenir est simple. Rien de sensible n’est écrit en clair. Les identifiants passent par un coffre. L’adresse de la machine naît au moment de sa création, puis sert à l’installation.
-
-Sur les postes, l’agent pointe vers l’adresse privée du serveur, jamais vers l’adresse publique. Le serveur pousse ensuite, à chaque groupe, la liste des dossiers à surveiller. Yaoundé et Maroua reçoivent des consignes adaptées, sans visite sur chaque bureau.
+Le seuil de notification retenu couvre les incidents sérieux. Une attaque par force brute le franchit, de même qu’un fichier jugé malveillant par VirusTotal. Les modifications détectées dans les répertoires surveillés déclenchent également un message, afin que l’analyse d’empreinte ne demeure pas silencieuse. Les comptes rendus d’exécution — blocage effectif, agent déconnecté — suivent la même voie, ce qui permet à l’équipe de suivre l’incident de son ouverture à sa clôture.
 
 ---
 
-## Section 2 : Mise en œuvre, essais et enseignements
+### 3.1.4. Organisation du dépôt et gestion des secrets
 
-Cette section quitte le papier. Elle montre comment la plateforme s’installe, puis comment elle se comporte face aux deux menaces du chapitre 2. L’essai de Maroua rejoue, point par point, le diagramme de séquence de la figure 3.0b.
+Le projet tient dans un dépôt Git unique, structuré en trois ensembles : les fichiers Terraform qui décrivent la machine de supervision, les rôles Ansible qui installent Wazuh, le relais de messagerie, le client du réseau privé, les règles de détection et les scripts de réponse active, enfin la définition du pipeline GitHub Actions.
 
-### 3.2.1. Du projet validé à la plateforme prête
+Ces fichiers ne sont pas reproduits ici, car leur volume nuirait à la lecture ; on se référera pour le détail à l’annexe A. Le principe directeur mérite en revanche d’être souligné : aucune donnée sensible n’apparaît en clair dans le dépôt. Les identifiants du fournisseur cloud, le jeton du réseau privé, les paramètres du relais de messagerie et la clé d’interrogation de VirusTotal proviennent tous du coffre de secrets, injectés à l’exécution puis chiffrés dans un fichier temporaire.
 
-Un enchaînement unique suffit. Il a trois temps.
+Sur les postes, l’agent est configuré pour joindre l’adresse privée du serveur, jamais son adresse publique. Le serveur transmet ensuite à chaque groupe la liste des répertoires à surveiller, ce qui évite toute intervention manuelle chez les utilisateurs.
 
-Le premier temps contrôle. Les descriptions sont-elles cohérentes ? Si non, on s’arrête. On ne crée pas de machine sur une base fautive.
+---
 
-Le deuxième temps crée, dans le cloud, l’ordinateur de supervision et ses règles d’accès. Il en tire l’adresse utile à l’étape suivante.
+## Section 2 : Mise en œuvre, expérimentations et résultats
 
-Le troisième temps installe le SIEM, règle la messagerie, ouvre le réseau privé, pose les consignes de détection et les gestes de défense. Si le SIEM est déjà là, on ne le réinstalle pas. On met à jour ce qui a changé. Le travail se répète donc sans tout casser.
+Cette seconde section confronte l’architecture au banc d’essai. Elle décrit d’abord le déroulement du déploiement automatisé, puis éprouve la solution sur les deux familles de menaces identifiées au chapitre 2. L’expérimentation menée à Maroua rejoue, étape par étape, le diagramme de séquence de la figure 3.0b, et celle du siège celui de la figure 3.0c.
 
-Reste le raccordement des postes. Il se fait au laboratoire, sur les copies de Yaoundé et de Maroua. Chaque agent rejoint son groupe. Un courriel peut déjà dire qu’un agent s’est connecté, ou qu’il a disparu. Avant les essais, nous vérifions cinq points simples. Les machines se voient-elles sur le réseau privé ? Les deux agents sont-ils actifs ? La file de messagerie est-elle vide ? Un refus d’envoi apparaît-il ? Un message de test arrive-t-il dans la boîte de l’équipe ?
+### 3.2.1. Déroulement du déploiement automatisé
+
+Une validation sur le dépôt suffit à reconstruire l’ensemble de la plateforme. Le pipeline s’exécute en trois temps.
+
+La première étape contrôle la cohérence des descriptions d’infrastructure et de configuration. En cas d’anomalie, le pipeline s’interrompt : aucune machine n’est créée sur une base défectueuse, ce qui matérialise concrètement le principe DevSecOps énoncé plus haut.
+
+La deuxième étape provisionne, dans le cloud, la machine de supervision ainsi que ses règles de filtrage, puis en extrait l’adresse nécessaire à la suite des opérations.
+
+La troisième étape installe Wazuh, configure le relais de messagerie, établit la liaison privée, déploie les règles de détection et les scripts de réponse active. Lorsque le SIEM est déjà présent, l’installation complète est omise au profit d’une simple mise à jour des paramètres, de sorte que le pipeline peut être relancé sans effet destructeur.
 
 ```
 +-----------------------------------------------------------------------------------+
 |                                                                                   |
-|     [ ZONE D'INSERTION : CAPTURE GITHUB ACTIONS — INSTALLATION ]                  |
-|     Coller ici la capture du pipeline (jobs test, terraform, ansible).            |
-|     Hauteur conseillée : 8 cm. Centrer l'image.                                   |
+|     [ ZONE D'INSERTION : PIPELINE GITHUB ACTIONS ]                                |
+|     Coller ici la capture du pipeline (étapes de validation, provisionnement,     |
+|     configuration). Hauteur conseillée : 7 cm. Centrer l'image.                   |
 |                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.2 :** Enchaînement automatique de l’installation  
+**Figure 3.2 :** Exécution du pipeline d’intégration et de déploiement continus  
 **Source :** Dépôt du projet de stage (2026)
 
-La première installation dure plus longtemps. C’est normal : le SIEM s’installe en entier. Les fois suivantes vont plus vite. On ne refait que les réglages.
-
-L’interface Wazuh Dashboard confirme ensuite le raccordement. Les deux agents, Yaoundé et Maroua, y apparaissent comme actifs, chacun dans son groupe.
+Le raccordement des postes constitue la dernière opération. Chaque agent rejoint le groupe correspondant à son site, et sa connexion comme sa déconnexion donnent lieu à une notification. Avant d’ouvrir les expérimentations, nous vérifions cinq conditions : la visibilité mutuelle des machines sur le réseau privé, l’état actif des deux agents, la vacuité de la file de messagerie, l’absence de rejet lors de l’envoi, et la bonne réception d’un message de test. La console Wazuh Dashboard confirme ce dernier point en affichant les deux agents.
 
 ```
 +-----------------------------------------------------------------------------------+
 |                                                                                   |
 |     [ ZONE D'INSERTION : INTERFACE WAZUH DASHBOARD — LISTE DES AGENTS ]           |
-|     Coller ici la capture Wazuh (Agents) : SITE-1 et SITE-2 au statut Active.     |
-|     Hauteur conseillée : 8 cm. Centrer l'image.                                   |
+|     Coller ici la capture Wazuh (Agents) : postes du siège et de la succursale    |
+|     au statut « Active ». Hauteur conseillée : 7 cm. Centrer l'image.             |
 |                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.3 :** Interface Wazuh Dashboard : agents du siège et de la succursale  
+**Figure 3.3 :** Interface Wazuh Dashboard : agents raccordés du siège et de la succursale  
 **Source :** Interface Wazuh Dashboard (2026)
 
 ---
 
-### 3.2.2. Premier essai : une attaque par mot de passe à Maroua
+### 3.2.2. Expérimentation 1 : attaque par force brute contre un poste de Maroua
 
-Le chapitre 2 nommait deux portes : la connexion distante en ligne de commande, et le bureau à distance Windows. Nous éprouvons la première sur un poste Linux de Maroua. Sur un poste Windows du siège, le pare-feu local joue le même rôle de barrage. Le déroulement suit le diagramme de séquence (figure 3.0b).
+Le chapitre 2 a désigné deux vecteurs d’attaque par force brute : la connexion distante en ligne de commande et le bureau à distance. Nous éprouvons le premier sur un poste Linux de la succursale, le pare-feu local assurant une protection équivalente sur les postes Windows du siège.
 
-#### 3.2.2.1. Conduite de l’essai
+#### 3.2.2.1. Protocole expérimental
 
-L’attaquant n’appartient pas au réseau privé de SSN. Il se place hors du réseau de Maroua. Il lance un outil qui essaie, l’un après l’autre, des mots de passe tirés d’une liste courte, faite pour le laboratoire. Chaque échec s’écrit sur le poste. L’agent envoie ces lignes au serveur, par le lien chiffré.
+L’attaquant est positionné hors du réseau de Maroua et n’appartient pas au réseau privé de l’entreprise. Il lance un outil de test par dictionnaire qui soumet successivement une liste de mots de passe constituée pour le laboratoire. Chaque échec est journalisé sur le poste, puis transmis au serveur par la liaison chiffrée.
 
-#### 3.2.2.2. Ce que le SIEM comprend, et ce que l’équipe reçoit
+#### 3.2.2.2. Corrélation et notification de l’équipe
 
-Un échec isolé n’alarme personne. Une série, si. Le moteur reconnaît la rafale. Il lève une alerte grave. Un courriel part alors, comme la flèche droite du diagramme de séquence. Il dit quelle machine est visée, depuis quelle adresse, et de quel type d’attaque il s’agit. Un second message suit lorsque le blocage est confirmé. L’analyste tient le début et la fin, même s’il n’a pas l’écran sous les yeux.
+Un échec isolé ne déclenche rien, conformément au besoin BF-02. La répétition, en revanche, active le moteur de corrélation, qui produit une alerte de gravité élevée. Un courriel part alors vers l’équipe, correspondant à la branche droite du diagramme de séquence. Il précise la machine visée, l’adresse à l’origine des tentatives et la nature de l’attaque. Un second message confirme ensuite l’exécution du blocage, si bien que l’analyste dispose du début et de la fin de l’incident sans avoir consulté la console.
 
 ```
 +-----------------------------------------------------------------------------------+
 |                                                                                   |
-|        [ ZONE D'INSERTION : CAPTURE DU COURRIEL D'ALERTE — FORCE BRUTE ]          |
-|        Coller ici la capture de la boîte mail (objet, agent Maroua, adresse       |
-|        source). Hauteur conseillée : 8 cm. Centrer l'image.                       |
+|     [ ZONE D'INSERTION : COURRIEL D'ALERTE — FORCE BRUTE ]                        |
+|     Coller ici la capture du message (objet, agent concerné, adresse source).     |
+|     Hauteur conseillée : 7 cm. Centrer l'image.                                   |
 |                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.4 :** Courriel d’alerte reçu par l’équipe lors de l’attaque par mot de passe  
+**Figure 3.4 :** Courriel d’alerte reçu lors de l’attaque par force brute  
 **Source :** Boîte de messagerie de l’équipe de supervision (2026)
 
 ```
 +-----------------------------------------------------------------------------------+
 |                                                                                   |
-|     [ ZONE D'INSERTION : CAPTURE DU COURRIEL DE CONFIRMATION DU BLOCAGE ]         |
-|     Coller ici le second message (confirmation que l’adresse a été bloquée).      |
-|     Hauteur conseillée : 8 cm. Centrer l'image.                                   |
+|     [ ZONE D'INSERTION : COURRIEL DE CONFIRMATION DU BLOCAGE ]                    |
+|     Coller ici le second message confirmant le blocage de l'adresse.              |
+|     Hauteur conseillée : 7 cm. Centrer l'image.                                   |
 |                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.5 :** Courriel de confirmation du blocage automatique  
+**Figure 3.5 :** Courriel de confirmation de la réponse active  
 **Source :** Boîte de messagerie de l’équipe de supervision (2026)
 
-#### 3.2.2.3. Ce que le poste fait tout seul
+#### 3.2.2.3. Réponse active sur le poste visé
 
-Dès que la rafale est reconnue, le serveur donne un ordre au poste visé. C’est la flèche gauche du même diagramme. Le poste bloque l’adresse pendant une heure. Les essais suivants n’obtiennent plus de réponse. Sous Windows, le pare-feu du poste joue le même rôle.
+Dès la corrélation établie, le serveur transmet un ordre de blocage au poste concerné, ce qui correspond à la branche gauche du même diagramme. L’agent insère une règle de filtrage qui rejette l’adresse de l’attaquant pendant une heure, durée au terme de laquelle la règle disparaît automatiquement. Les tentatives suivantes n’obtiennent plus aucune réponse du service d’authentification.
 
-Nous vérifions le résultat de quatre manières. L’interface Wazuh Dashboard montre l’alerte et la confirmation. Le journal de l’agent consigne l’action. La liste de filtrage contient l’adresse bloquée. La boîte mail contient les deux messages. L’outil d’attaque cesse d’avancer.
+Nous validons ce résultat par quatre observations convergentes : la console affiche l’alerte et sa confirmation, le journal de l’agent consigne l’exécution, la table de filtrage du poste contient l’adresse bloquée, et la boîte de l’équipe reçoit les deux messages.
 
 ```
 +-----------------------------------------------------------------------------------+
 |                                                                                   |
 |     [ ZONE D'INSERTION : INTERFACE WAZUH DASHBOARD — FORCE BRUTE ]                |
-|     Coller ici la capture Wazuh (Security events) : alerte de rafale et           |
-|     confirmation du blocage. Hauteur conseillée : 8 cm. Centrer l'image.          |
+|     Coller ici la capture Wazuh (Security events) : alerte de corrélation et      |
+|     réponse active. Hauteur conseillée : 7 cm. Centrer l'image.                   |
 |                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.6 :** Interface Wazuh Dashboard : détection de l’attaque par mot de passe et blocage  
+**Figure 3.6 :** Interface Wazuh Dashboard : détection de la force brute et blocage automatique  
 **Source :** Interface Wazuh Dashboard (2026)
 
-Le délai avant détection se compte en secondes, le temps que la rafale soit reconnue. Le délai avant blocage reste inférieur à une minute. Ces temps ne dépendent plus d’un technicien présent.
+Le délai de détection se compte en secondes, le temps que la fréquence d’échecs atteigne le seuil de corrélation, et le délai de réponse demeure inférieur à la minute. Ces durées ne dépendent plus de la disponibilité d’un technicien.
 
 ---
 
-### 3.2.3. Second essai : un fichier modifié ou un logiciel dangereux
+### 3.2.3. Expérimentation 2 : altération d’un fichier et détection d’un logiciel malveillant
 
-Le chapitre 2 décrivait un second scénario. Un fichier malveillant arrive, souvent par téléchargement. Il change des dossiers. Rien ne le voit. Il s’exécute. Parfois, il efface les traces. Nous éprouvons ici deux gestes. L’un touche un programme système. L’autre dépose un fichier dans Téléchargements. Le déroulement suit le diagramme de séquence de la figure 3.0c.
+Le second scénario du diagnostic concerne le fichier malveillant, généralement introduit par téléchargement, qui modifie le système sans déclencher la moindre alerte. Nous éprouvons deux variantes : l’altération d’un exécutable système et le dépôt d’un fichier dans le répertoire surveillé.
 
-#### 3.2.3.1. Conduite de l’essai
+#### 3.2.3.1. Protocole expérimental
 
-Au siège, nous altérons, de façon contrôlée, un programme d’ouverture de session. Le contrôle d’intégrité recalcule l’empreinte du fichier. Le changement remonte au serveur. C’est un signal grave : la confiance dans le poste s’effondre.
+Au siège, nous modifions de manière contrôlée un programme d’ouverture de session. Le contrôle d’intégrité recalcule aussitôt l’empreinte du fichier et transmet l’écart au serveur. Le signal est grave, car un exécutable d’authentification altéré remet en cause la confiance accordée à l’ensemble du poste.
 
-Nous déposons ensuite un fichier dans Téléchargements, à Yaoundé puis à Maroua. Chaque site a sa consigne. Le SIEM voit l’ajout ou la modification. Il envoie l’empreinte à VirusTotal. VirusTotal croise plusieurs moteurs. S’ils s’accordent pour dire que le fichier est dangereux, une alerte plus forte s’élève. La suppression part alors, comme sur la figure 3.0c.
+Nous déposons ensuite un fichier de test dans le dossier Téléchargements, successivement au siège et à la succursale, afin de vérifier que chaque groupe applique bien sa propre consigne. Le serveur transmet l’empreinte à VirusTotal, qui confronte celle-ci à ses moteurs d’analyse. La convergence de plusieurs verdicts défavorables élève alors la gravité de l’alerte et autorise la suppression automatique.
 
-#### 3.2.3.2. Ce que l’équipe apprend par courriel
+#### 3.2.3.2. Notification de l’équipe
 
-Le message décrit le chemin du fichier, l’ancienne et la nouvelle empreinte, la machine concernée. Il part pendant que le poste agit, comme la flèche droite du diagramme de séquence (figure 3.0c). L’analyste n’ouvre pas l’écran pour apprendre qu’un téléchargement vient d’être jugé dangereux, ou qu’un programme système a changé. Un dernier courriel dit si la suppression a réussi ou échoué.
+Le courriel reçu précise le chemin du fichier, ses empreintes avant et après modification, ainsi que la machine concernée. Comme dans l’expérimentation précédente, il part pendant l’exécution de la réponse active. Un dernier message rend compte du résultat de la suppression, qu’elle ait abouti ou échoué.
 
 ```
 +-----------------------------------------------------------------------------------+
 |                                                                                   |
-|     [ ZONE D'INSERTION : CAPTURE DU COURRIEL D'ALERTE — MALWARE / VIRUSTOTAL ]    |
-|     Coller ici le courriel (chemin du fichier, empreinte, verdict VirusTotal).    |
-|     Hauteur conseillée : 8 cm. Centrer l'image.                                   |
+|     [ ZONE D'INSERTION : COURRIEL D'ALERTE — VERDICT VIRUSTOTAL ]                 |
+|     Coller ici le message (chemin du fichier, empreinte, verdict VirusTotal).     |
+|     Hauteur conseillée : 7 cm. Centrer l'image.                                   |
 |                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.7 :** Courriel d’alerte reçu après le verdict VirusTotal  
+**Figure 3.7 :** Courriel d’alerte émis après le verdict de VirusTotal  
 **Source :** Boîte de messagerie de l’équipe de supervision (2026)
 
 ```
 +-----------------------------------------------------------------------------------+
 |                                                                                   |
-|     [ ZONE D'INSERTION : CAPTURE DU COURRIEL DE COMPTE RENDU DE SUPPRESSION ]     |
-|     Coller ici le message de succès ou d’échec de la suppression du fichier.      |
-|     Hauteur conseillée : 8 cm. Centrer l'image.                                   |
+|     [ ZONE D'INSERTION : COURRIEL DE COMPTE RENDU DE SUPPRESSION ]                |
+|     Coller ici le message indiquant le succès ou l'échec de la suppression.       |
+|     Hauteur conseillée : 7 cm. Centrer l'image.                                   |
 |                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
@@ -450,20 +438,18 @@ Le message décrit le chemin du fichier, l’ancienne et la nouvelle empreinte, 
 **Figure 3.8 :** Courriel de compte rendu de la suppression du fichier  
 **Source :** Boîte de messagerie de l’équipe de supervision (2026)
 
-#### 3.2.3.3. Deux réponses, selon la gravité
+#### 3.2.3.3. Réponses graduées selon la gravité
 
-Si le fichier de Téléchargements est reconnu dangereux par VirusTotal, l’agent l’efface. C’est la flèche gauche du même diagramme. Sous Windows, le même principe s’applique. Le ticket de dépannage n’est plus le premier geste.
+Lorsque VirusTotal confirme la dangerosité d’un fichier déposé dans le répertoire surveillé, l’agent le supprime immédiatement. Le dépannage manuel cesse ainsi d’être le premier geste, et la menace disparaît avant toute exécution.
 
-Si c’est un programme d’ouverture de session qui a changé, ôter un fichier ne suffit plus. Le poste peut servir de tremplin. Nous demandons alors un isolement. Le poste cesse de parler à ses voisins. Il garde le lien privé d’administration. L’analyste l’interroge encore. Il ne se propage plus. C’est l’isolement qui manquait au chapitre 2.
-
-L’interface Wazuh Dashboard montre le changement de fichier, le verdict VirusTotal, puis l’effet de la réponse : fichier ôté, ou poste isolé.
+Lorsque la modification affecte un exécutable système, la suppression ne suffit plus, car le poste peut servir de point d’appui vers le reste du réseau. Nous déclenchons alors un isolement : la machine cesse de communiquer avec ses voisines du réseau local, tout en conservant la liaison privée d’administration. L’analyste continue de l’interroger et d’y conduire son investigation, alors que la propagation latérale devient impossible. C’est très exactement le mécanisme de confinement dont le chapitre 2 constatait l’absence.
 
 ```
 +-----------------------------------------------------------------------------------+
 |                                                                                   |
-|     [ ZONE D'INSERTION : INTERFACE WAZUH DASHBOARD — FIM ET VIRUSTOTAL ]          |
-|     Coller ici la capture Wazuh (Integrity monitoring / alerte VirusTotal) :      |
-|     chemin du fichier, empreinte, verdict. Hauteur conseillée : 8 cm.             |
+|     [ ZONE D'INSERTION : INTERFACE WAZUH DASHBOARD — INTÉGRITÉ ET VIRUSTOTAL ]    |
+|     Coller ici la capture Wazuh (Integrity monitoring et alerte VirusTotal).      |
+|     Hauteur conseillée : 7 cm. Centrer l'image.                                   |
 |                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
@@ -474,28 +460,28 @@ L’interface Wazuh Dashboard montre le changement de fichier, le verdict VirusT
 ```
 +-----------------------------------------------------------------------------------+
 |                                                                                   |
-|     [ ZONE D'INSERTION : INTERFACE WAZUH DASHBOARD — RÉPONSE ET ISOLEMENT ]       |
+|     [ ZONE D'INSERTION : INTERFACE WAZUH DASHBOARD — RÉPONSE ACTIVE ]             |
 |     Coller ici la capture Wazuh (Active response) : suppression ou isolement.     |
-|     Hauteur conseillée : 8 cm. Centrer l'image.                                   |
+|     Hauteur conseillée : 7 cm. Centrer l'image.                                   |
 |                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.10 :** Interface Wazuh Dashboard : suppression du fichier ou isolement du poste  
+**Figure 3.10 :** Interface Wazuh Dashboard : suppression du fichier et isolement du poste  
 **Source :** Interface Wazuh Dashboard (2026)
 
 ---
 
-### 3.2.4. Ce que change la solution pour SSN
+### 3.2.4. Résultats et apport pour l’entreprise
 
-Les deux sites apparaissent désormais dans un seul écran de l’interface Wazuh Dashboard. Les attaques du diagnostic reçoivent une réponse. L’équipe est prévenue sans attendre un appel.
+Les deux sites sont désormais supervisés depuis une console unique, les menaces identifiées au diagnostic reçoivent une réponse immédiate, et l’équipe est informée sans attendre l’appel d’un utilisateur.
 
 ```
 +-----------------------------------------------------------------------------------+
 |                                                                                   |
 |     [ ZONE D'INSERTION : INTERFACE WAZUH DASHBOARD — VUE D'ENSEMBLE ]             |
-|     Coller ici l’écran d’accueil Wazuh (agents, alertes, deux sites).             |
-|     Hauteur conseillée : 8 cm. Centrer l'image.                                   |
+|     Coller ici l'écran d'accueil (agents, alertes, répartition par site).         |
+|     Hauteur conseillée : 7 cm. Centrer l'image.                                   |
 |                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
@@ -503,37 +489,37 @@ Les deux sites apparaissent désormais dans un seul écran de l’interface Wazu
 **Figure 3.11 :** Interface Wazuh Dashboard : vue d’ensemble de la supervision des deux sites  
 **Source :** Interface Wazuh Dashboard (2026)
 
-Le tableau III.2 place côte à côte le constat du chapitre 2 et le résultat du chapitre 3.
+Le tableau III.2 confronte le constat du chapitre 2 aux résultats obtenus.
 
 ```
-+------------------------------+-------------------------------+------------------------------+
-| Point observé                | Avant (chapitre 2)            | Après (chapitre 3)           |
-+------------------------------+-------------------------------+------------------------------+
-| Lien Yaoundé – Maroua        | Aucun lien privé              | Réseau privé chiffré         |
-| Journaux                     | Restent sur chaque poste      | Copiés vers le serveur       |
-| Attaque par mot de passe     | Pas d’alerte, pas de blocage  | Détection et blocage rapides |
-| Fichier dangereux            | Invisible plusieurs semaines  | Vu, jugé par VirusTotal, ôté |
-| Poste infecté                | Reste dans le réseau          | Isolé, accès d’admin gardé   |
-| Intervention                 | À la demande de l’utilisateur | Action auto et courriel      |
-| Installation du SIEM         | Longue, manuelle              | Reproductible, automatisée   |
-| Panne au siège               | Aveugle aussi Maroua          | Cerveau resté dans le cloud  |
-+------------------------------+-------------------------------+------------------------------+
++------------------------------+-------------------------------+-------------------------------+
+| Point observé                | Avant (chapitre 2)            | Après (chapitre 3)            |
++------------------------------+-------------------------------+-------------------------------+
+| Liaison Yaoundé – Maroua     | Aucune liaison privée         | Réseau privé chiffré          |
+| Journaux de sécurité         | Cloisonnés sur chaque poste   | Centralisés sur le serveur    |
+| Attaque par force brute      | Ni alerte ni blocage          | Détection et blocage < 1 min  |
+| Fichier malveillant          | Invisible plusieurs semaines  | Qualifié par VirusTotal, ôté  |
+| Poste compromis              | Maintenu sur le réseau        | Isolé, administration gardée  |
+| Modèle d'intervention        | Réactif, à la demande         | Réponse active et courriel    |
+| Déploiement du SIEM          | Manuel et long                | Automatisé et reproductible   |
+| Panne au siège               | Perte de visibilité globale   | Serveur maintenu dans le cloud|
++------------------------------+-------------------------------+-------------------------------+
 ```
 
 **Tableau III.2 :** Comparaison entre le diagnostic du chapitre 2 et la solution mise en œuvre
 
-Les délais se mesurent simplement. Le MTTD court du premier essai de mot de passe, ou du premier changement de fichier, jusqu’à l’alerte. Le MTTR court de cette alerte jusqu’à l’effet visible : adresse bloquée, fichier absent, poste injoignable sur le réseau local. Le courriel n’accélère pas, à lui seul, la détection technique. Il accélère l’information de l’humain. Sans lui, une défense silencieuse laisserait l’équipe dans l’ignorance.
+Les délais se mesurent de façon reproductible. Le temps de détection sépare la première tentative d’authentification, ou la première modification de fichier, de l’apparition de l’alerte corrélée. Le temps de réponse sépare cette alerte de son effet observable : adresse rejetée, fichier absent du disque, poste injoignable sur le réseau local. Le courriel n’améliore pas, à lui seul, le temps de détection technique, puisque la corrélation y suffit ; il réduit en revanche le délai d’information de l’équipe, qui conditionne toute investigation ultérieure.
 
-Pour SSN, le premier gain est interne. Le parc de la Direction Technique, décrit au chapitre 1, n’est plus un ensemble de machines isolées. Yaoundé et Maroua partagent enfin une même lecture des incidents. Le second gain est commercial. L’entreprise propose déjà l’audit, le test d’intrusion et la corrélation d’événements. Le même enchaînement se montre à un client, puis s’adapte, sans tout réécrire. Le laboratoire sert de démonstration. Il n’expose pas le système d’un tiers. Cette double utilité — protéger SSN, puis servir d’offre — justifie l’effort d’automatisation. Un réglage fait à la main sur une seule machine ne se vend pas. Un projet reproductible, si.
+L’apport pour SSN se lit à deux niveaux. En interne, le parc de la Direction Technique cesse d’être un ensemble de machines surveillées isolément : le siège et la succursale partagent enfin une lecture commune des incidents. En externe, la démarche constitue un actif réutilisable pour les prestations d’audit, de test d’intrusion et de supervision que l’entreprise commercialise déjà. Le même pipeline se redéploie chez un client avec d’autres paramètres, et le laboratoire sert de support de démonstration sans exposer aucun système tiers. Cette transposabilité justifie l’effort d’automatisation : une configuration ajustée à la main sur une seule machine ne se reproduit pas, alors qu’un déploiement décrit sous forme de code se reproduit immédiatement.
 
-Des limites demeurent. Un seul serveur rassemble aujourd’hui tous les rôles. Une panne de cette machine arrêterait la vue. L’accès d’installation depuis le service automatique reste volontairement large, car les adresses de ce service changent. L’enregistrement d’un agent ne demande pas encore un mot de passe. Ces points relèvent d’un travail ultérieur. Ils n’effacent pas le résultat obtenu sur le banc d’essai.
+Plusieurs limites subsistent néanmoins. Le serveur concentre aujourd’hui l’ensemble des rôles, si bien qu’une défaillance de cette machine interromprait la supervision. L’accès d’administration ouvert au service d’intégration continue demeure volontairement large, faute d’adresses stables côté fournisseur. L’enrôlement d’un nouvel agent, enfin, ne requiert pas encore de mot de passe. Ces points relèvent d’un durcissement ultérieur et n’invalident pas les résultats du banc d’essai.
 
 ---
 
 ## Conclusion du chapitre 3
 
-Nous avons proposé une solution adaptée au problème de SSN. Le cerveau de la supervision habite le cloud. Les agents restent sur les postes de Yaoundé et de Maroua. Un réseau privé fournit le lien qui manquait. Les postes se défendent seuls. L’équipe est prévenue par courriel.
+Ce chapitre a proposé une solution complète au problème diagnostiqué au chapitre 2. Le serveur de supervision Wazuh réside dans le cloud, les agents demeurent sur les postes du siège et de la succursale, et un réseau privé chiffré fournit la liaison qui faisait défaut entre les deux sites. Les machines visées se défendent désormais elles-mêmes, pendant que l’équipe reçoit une notification.
 
-La section 1 a fixé les besoins et les schémas, dont les deux diagrammes de séquence : force brute d’un côté, fichier dangereux de l’autre. La section 2 a montré que la plateforme s’installe de façon répétée, qu’une attaque par mot de passe à Maroua est stoppée, et qu’un fichier dangereux à Yaoundé est vu, signalé, puis traité.
+La première section a fixé le cahier des charges et modélisé la solution en UML, notamment à travers les deux diagrammes de séquence qui ordonnent la détection, la réponse active et la notification. La seconde a établi, par l’expérimentation, que la plateforme se déploie de manière reproductible, qu’une attaque par force brute menée contre un poste de Maroua est interrompue en moins d’une minute, et qu’un fichier malveillant déposé au siège est détecté, qualifié par VirusTotal, puis supprimé ou confiné.
 
-Le MTTD ne se compte plus en semaines. Le MTTR ne dépend plus d’un ticket. La conclusion générale reviendra sur le bilan du stage et sur les pistes d’amélioration. Pour les fichiers de configuration, on se référera à l’annexe A.
+Les deux indicateurs qui motivaient l’étude ont donc évolué : le temps de détection ne se compte plus en semaines mais en secondes, et le temps de réponse ne dépend plus de la sollicitation d’un utilisateur. La conclusion générale reviendra sur le bilan du stage, les compétences acquises et les perspectives de durcissement. Les fichiers de configuration correspondants sont reportés en annexe A.
