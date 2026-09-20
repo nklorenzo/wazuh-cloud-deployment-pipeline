@@ -5,7 +5,8 @@ Note Word — Guide ISJ 2025 (retirer avant impression) :
 - Titre et source SOUS chaque figure. Tableau d’auteur : pas de source.
 - Volume du chapitre 3 (Ingé 4) : 12 pages. Ne pas aérer ni condenser au-delà.
 - Coller dans rapport-de-stage.docx à la place du titre vide du chapitre 3.
-- Tableaux III.1 et III.2. Figures 3.1 à 3.5, plus 3.0a à 3.0d (UML).
+- Tableaux III.1 et III.2. Figures 3.1 à 3.7, plus 3.0a à 3.0d (UML).
+- Réserver les cadres « COURRIEL » pour les captures de la boîte mail (hauteur ~8 cm).
 - Exporter les PlantUML en PNG. Détail de configuration : annexe A.
 - Abréviation à ajouter en page liminaire : VirusTotal (VT).
 -->
@@ -338,6 +339,32 @@ L’attaquant n’appartient pas au réseau privé de SSN. Il se place hors du r
 
 Un échec isolé n’alarme personne. Une série, si. Le moteur reconnaît la rafale. Il lève une alerte grave. Un courriel part alors, comme la flèche droite du diagramme de séquence. Il dit quelle machine est visée, depuis quelle adresse, et de quel type d’attaque il s’agit. Un second message suit lorsque le blocage est confirmé. L’analyste tient le début et la fin, même s’il n’a pas l’écran sous les yeux.
 
+```
++-----------------------------------------------------------------------------------+
+|                                                                                   |
+|        [ ZONE D'INSERTION : CAPTURE DU COURRIEL D'ALERTE — FORCE BRUTE ]          |
+|        Coller ici la capture de la boîte mail (objet, agent Maroua, adresse       |
+|        source). Hauteur conseillée : 8 cm. Centrer l'image.                       |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+```
+
+**Figure 3.3 :** Courriel d’alerte reçu par l’équipe lors de l’attaque par mot de passe  
+**Source :** Boîte de messagerie de l’équipe de supervision (2026)
+
+```
++-----------------------------------------------------------------------------------+
+|                                                                                   |
+|     [ ZONE D'INSERTION : CAPTURE DU COURRIEL DE CONFIRMATION DU BLOCAGE ]         |
+|     Coller ici le second message (confirmation que l’adresse a été bloquée).      |
+|     Hauteur conseillée : 8 cm. Centrer l'image.                                   |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+```
+
+**Figure 3.4 :** Courriel de confirmation du blocage automatique  
+**Source :** Boîte de messagerie de l’équipe de supervision (2026)
+
 #### 3.2.2.3. Ce que le poste fait tout seul
 
 Dès que la rafale est reconnue, le serveur donne un ordre au poste visé. C’est la flèche gauche du même diagramme. Le poste bloque l’adresse pendant une heure. Les essais suivants n’obtiennent plus de réponse. Sous Windows, le pare-feu du poste joue le même rôle.
@@ -346,11 +373,15 @@ Nous vérifions le résultat de quatre manières. L’écran montre l’alerte e
 
 ```
 +-----------------------------------------------------------------------------------+
-|             [ ZONE D'INSERTION : ALERTE DE FORCE BRUTE ET COURRIEL ]              |
+|                                                                                   |
+|        [ ZONE D'INSERTION : TABLEAU DE BORD — FORCE BRUTE ET BLOCAGE ]            |
+|        Coller ici la capture de la console (alerte et confirmation).              |
+|        Hauteur conseillée : 8 cm. Centrer l'image.                                |
+|                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.3 :** Détection d’une attaque par mot de passe et blocage automatique  
+**Figure 3.5 :** Détection d’une attaque par mot de passe et blocage automatique  
 **Source :** Console de supervision (2026)
 
 Le délai avant détection se compte en secondes, le temps que la rafale soit reconnue. Le délai avant blocage reste inférieur à une minute. Ces temps ne dépendent plus d’un technicien présent.
@@ -371,6 +402,32 @@ Nous déposons ensuite un fichier dans Téléchargements, à Yaoundé puis à Ma
 
 Le message décrit le chemin du fichier, l’ancienne et la nouvelle empreinte, la machine concernée. Il part pendant que le poste agit, comme la flèche droite du diagramme de séquence (figure 3.0c). L’analyste n’ouvre pas l’écran pour apprendre qu’un téléchargement vient d’être jugé dangereux, ou qu’un programme système a changé. Un dernier courriel dit si la suppression a réussi ou échoué.
 
+```
++-----------------------------------------------------------------------------------+
+|                                                                                   |
+|     [ ZONE D'INSERTION : CAPTURE DU COURRIEL D'ALERTE — MALWARE / VIRUSTOTAL ]    |
+|     Coller ici le courriel (chemin du fichier, empreinte, verdict VirusTotal).    |
+|     Hauteur conseillée : 8 cm. Centrer l'image.                                   |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+```
+
+**Figure 3.6 :** Courriel d’alerte reçu après le verdict VirusTotal  
+**Source :** Boîte de messagerie de l’équipe de supervision (2026)
+
+```
++-----------------------------------------------------------------------------------+
+|                                                                                   |
+|     [ ZONE D'INSERTION : CAPTURE DU COURRIEL DE COMPTE RENDU DE SUPPRESSION ]     |
+|     Coller ici le message de succès ou d’échec de la suppression du fichier.      |
+|     Hauteur conseillée : 8 cm. Centrer l'image.                                   |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+```
+
+**Figure 3.7 :** Courriel de compte rendu de la suppression du fichier  
+**Source :** Boîte de messagerie de l’équipe de supervision (2026)
+
 #### 3.2.3.3. Deux réponses, selon la gravité
 
 Si le fichier de Téléchargements est reconnu dangereux par VirusTotal, l’agent l’efface. C’est la flèche gauche du même diagramme. Sous Windows, le même principe s’applique. Le ticket de dépannage n’est plus le premier geste.
@@ -379,11 +436,15 @@ Si c’est un programme d’ouverture de session qui a changé, ôter un fichier
 
 ```
 +-----------------------------------------------------------------------------------+
-|             [ ZONE D'INSERTION : ALERTE D'INTÉGRITÉ ET ISOLEMENT ]                |
+|                                                                                   |
+|        [ ZONE D'INSERTION : TABLEAU DE BORD — INTÉGRITÉ ET ISOLEMENT ]            |
+|        Coller ici la capture de la console (FIM, VirusTotal, isolement).          |
+|        Hauteur conseillée : 8 cm. Centrer l'image.                                |
+|                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.4 :** Alerte d’intégrité et mise à l’écart du poste compromis  
+**Figure 3.8 :** Alerte d’intégrité et mise à l’écart du poste compromis  
 **Source :** Console de supervision (2026)
 
 ---
@@ -394,11 +455,14 @@ Les deux sites apparaissent désormais dans un seul écran. Les attaques du diag
 
 ```
 +-----------------------------------------------------------------------------------+
-|             [ ZONE D'INSERTION : VUE D'ENSEMBLE DU TABLEAU DE BORD ]              |
+|                                                                                   |
+|        [ ZONE D'INSERTION : VUE D'ENSEMBLE DU TABLEAU DE BORD ]                   |
+|        Coller ici la vue générale des deux sites. Hauteur conseillée : 8 cm.      |
+|                                                                                   |
 +-----------------------------------------------------------------------------------+
 ```
 
-**Figure 3.5 :** Vue d’ensemble de la supervision des deux sites  
+**Figure 3.9 :** Vue d’ensemble de la supervision des deux sites  
 **Source :** Console de supervision (2026)
 
 Le tableau III.2 place côte à côte le constat du chapitre 2 et le résultat du chapitre 3.
